@@ -143,13 +143,7 @@ class Agent:
             content=user_message,
         )
         self.db.add(user_msg)
-
-        # Process through memory system (extracts memories from user message)
-        extracted_memories = await self.memory.add_user_message(
-            content=user_message,
-            message_id=user_msg_id,
-            session_id=conversation_id,
-        )
+        await self.db.flush()
 
         # Create agent run record
         agent_run = AgentRun(
@@ -160,6 +154,14 @@ class Agent:
             max_iterations=self.max_iterations,
         )
         self.db.add(agent_run)
+        await self.db.flush()
+
+        # Process through memory system (extracts memories from user message)
+        extracted_memories = await self.memory.add_user_message(
+            content=user_message,
+            message_id=user_msg_id,
+            session_id=conversation_id,
+        )
 
         try:
             # Run the agent loop
@@ -435,7 +437,9 @@ class Agent:
             conversation = Conversation(
                 id=conversation_id,
                 title=None,  # Will be set from first message later
+                is_active=True,
             )
             self.db.add(conversation)
+            await self.db.flush()
 
         return conversation

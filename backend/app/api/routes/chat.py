@@ -7,9 +7,12 @@ Receives a user message, runs it through the full agent loop
 (memory → AI → tools → verify), and returns the response.
 """
 
+import logging
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.agent.agent import Agent, AgentResponse
 from app.ai.provider import AIProvider
@@ -75,10 +78,17 @@ async def chat(
         memory_manager=memory_manager,
     )
 
-    result: AgentResponse = await agent.process_message(
-        user_message=request.message,
-        conversation_id=request.conversation_id,
-    )
+    try:
+        result: AgentResponse = await agent.process_message(
+            user_message=request.message,
+            conversation_id=request.conversation_id,
+        )
+    except Exception as e:
+        logger.error("Chat endpoint error processing message: %s", str(e), exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="MR.GREEN encountered an issue while generating a response. Please try again.",
+        )
 
     return ChatResponse(
         response=result.content,
