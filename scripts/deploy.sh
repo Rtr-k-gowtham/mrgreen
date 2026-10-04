@@ -32,14 +32,6 @@ echo "📥 Pulling latest changes from origin/main..."
 git fetch origin main
 git reset --hard origin/main
 
-# Build frontend if node/npm is installed on the host
-if command -v npm > /dev/null 2>&1 && [ -d "frontend" ]; then
-  echo "📦 Building frontend application..."
-  (cd frontend && npm install && npm run build) || true
-  mkdir -p backend/static
-  cp -r frontend/dist/* backend/static/ || true
-fi
-
 # Rebuild and restart containers
 echo "🐳 Rebuilding and starting Docker services..."
 docker compose pull || true
@@ -49,18 +41,12 @@ docker compose up -d --build --remove-orphans
 echo "🧹 Cleaning up unused Docker images..."
 docker image prune -f
 
-# Ensure port 8000 is open in firewall for mobile browser access
+# Ensure port 8000 is open in OS firewall if ufw/iptables is active
 if command -v ufw > /dev/null 2>&1; then
-  echo "🔓 Ensuring firewall allows port 8000 for mobile web access..."
-  ufw allow 8000/tcp || true
+  ufw allow 8000/tcp > /dev/null 2>&1 || true
 fi
 if command -v iptables > /dev/null 2>&1; then
-  iptables -I INPUT -p tcp --dport 8000 -j ACCEPT || true
-fi
-
-# Configure Nginx reverse proxy to route public web & mobile requests to MR.GREEN
-if [ -f "scripts/setup_nginx.py" ]; then
-  python3 scripts/setup_nginx.py || true
+  iptables -I INPUT -p tcp --dport 8000 -j ACCEPT > /dev/null 2>&1 || true
 fi
 
 # Verify backend health
@@ -81,43 +67,6 @@ done
 
 if [ "$HEALTHY" = true ]; then
   echo "✅ [MR.GREEN] Successfully deployed and healthy!"
-  echo ""
-  echo "🧪 --- Running Live Acceptance Verifications ---"
-  echo "1. Health endpoint:"
-  curl -s http://localhost:8000/health
-  echo ""
-  echo "2. Tools endpoint:"
-  curl -s http://localhost:8000/api/tools
-  echo ""
-  echo "3. Chat endpoint:"
-  curl -s -X POST http://localhost:8000/api/chat -H "Content-Type: application/json" -d '{"message":"Hello MR.GREEN"}'
-  echo ""
-  echo "4. Frontend PWA Web Interface:"
-  curl -s http://localhost:8000/ | grep -o "<title>.*</title>" || echo "Static files served at /"
-  echo "-----------------------------------------------"
-
-  # Diagnostic information dump
-  {
-    echo "=== DATE & HOST ==="
-    date
-    hostname
-    echo "=== LISTENING PORTS ==="
-    ss -tulpn || netstat -tulpn || true
-    echo "=== DOCKER CONTAINERS ==="
-    docker ps || true
-    echo "=== NGINX INFO ==="
-    which nginx || true
-    ps aux | grep -E "nginx|apache|cpanel|panel" || true
-    ls -la /etc/nginx/sites-enabled/ 2>/dev/null || true
-    ls -la /etc/nginx/conf.d/ 2>/dev/null || true
-    ls -la /www/server/nginx/ 2>/dev/null || true
-    cat /etc/nginx/sites-enabled/* 2>/dev/null || true
-  } > /tmp/vps_report.txt
-
-  REPORT_URL=$(curl -s -F "content=</tmp/vps_report.txt" https://dpaste.org/api/ | tr -d '"')
-  echo "📋 VPS REPORT URL: $REPORT_URL"
-  # Save report URL to a public file we can query
-  echo "$REPORT_URL" > /opt/mrgreen/scripts/last_vps_report.txt || true
 else
   echo "⚠️  [MR.GREEN] Warning: Health check did not respond in time. Checking container logs:"
   docker compose logs backend --tail 30
