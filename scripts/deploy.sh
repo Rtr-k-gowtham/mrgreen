@@ -59,40 +59,8 @@ if command -v iptables > /dev/null 2>&1; then
 fi
 
 # Configure Nginx reverse proxy to route public web & mobile requests to MR.GREEN
-if command -v nginx > /dev/null 2>&1 && [ -d "/etc/nginx" ]; then
-  echo "🌐 Configuring Nginx reverse proxy for MR.GREEN on ports 80 and 443..."
-  python3 -c "
-import glob, re, os
-
-proxy_block = '''
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \"upgrade\";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-'''
-
-for filepath in glob.glob('/etc/nginx/sites-enabled/*') + glob.glob('/etc/nginx/conf.d/*'):
-    if not os.path.isfile(filepath):
-        continue
-    try:
-        with open(filepath, 'r') as f:
-            content = f.read()
-        if '127.0.0.1:8000' in content:
-            continue
-        if 'location / {' in content:
-            new_content = re.sub(r'location\s+/\s*\{[^}]*\}', 'location / {' + proxy_block + '}', content)
-            with open(filepath, 'w') as f:
-                f.write(new_content)
-            print(f'Updated {filepath} to proxy to MR.GREEN')
-    except Exception as e:
-        print('Error updating', filepath, e)
-" || true
-
-  nginx -t && (systemctl reload nginx || service nginx reload) || echo "Nginx reload skipped"
+if [ -f "scripts/setup_nginx.py" ]; then
+  python3 scripts/setup_nginx.py || true
 fi
 
 # Verify backend health
