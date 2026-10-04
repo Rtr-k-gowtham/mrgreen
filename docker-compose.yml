@@ -1,0 +1,29 @@
+# MR.GREEN — Development Services
+# ==================================
+# Run: docker-compose up -d
+# This starts PostgreSQL with pgvector for local development.
+
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: mrgreen-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mrgreen
+      POSTGRES_PASSWORD: mrgreen_dev_password
+      POSTGRES_DB: mrgreen_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - mrgreen_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mrgreen -d mrgreen_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mrgreen_pgdata:
+    driver: local

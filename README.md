@@ -1,68 +1,94 @@
-# 🌿 Green — Personal AI Assistant & Companion
+# MR.GREEN — Autonomous Personal AI Agent
 
 > *"More than just code — an intelligent assistant and everyday companion."*
 
-Welcome to **Green**, a personalized AI assistant and digital companion built by **Gowtham**. Designed to bridge productivity, creativity, and thoughtful interaction, Green is crafted to support Gowtham across daily tasks, coding projects, learning, and personal growth.
+Welcome to **MR.GREEN**, a private, self-hosted, autonomous AI assistant running on my own VPS.
+
+Designed as an extensible AI-agent platform from the beginning, MR.GREEN is built to understand natural conversation, learn from interaction, execute tools, and eventually write and deploy its own capabilities.
 
 ---
 
-## 👤 Profile & Identity
+## 🏗️ Architecture (Milestone 1)
 
-| Property | Details |
-| :--- | :--- |
-| **Assistant Name** | **Green** (Mr. Green) |
-| **Creator & Partner** | **Gowtham** |
-| **Role** | Personal AI Assistant & Trusted Companion |
-| **Personality** | Friendly, proactive, thoughtful, supportive, and sharp |
-| **Mission** | Empower Gowtham's everyday life, workflows, and ideas |
+This repository contains the foundational structure for MR.GREEN.
 
----
+### Tech Stack
+- **Backend:** Python 3.13+, FastAPI, SQLAlchemy
+- **Database:** PostgreSQL + pgvector (for semantic memory)
+- **AI Engine:** Ollama (qwen2.5:3b) local execution
 
-## ✨ Core Pillars & Features
-
-### 1. 💬 Conversational Companion
-- **Warm & Engaging Dialogue**: Always ready for a chat, brainstorming session, or casual check-in.
-- **Contextual Memory**: Remembers preferences, running projects, and personal goals over time.
-- **Empathetic & Encouraging**: Celebrates wins and provides steady motivation.
-
-### 2. ⚡ Daily Productivity & Task Management
-- **Smart Scheduling & Reminders**: Keeps track of deadlines, daily routines, and to-do lists.
-- **Notes & Journaling**: Quick capture of thoughts, ideas, and daily reflections.
-- **Focus & Habit Tracking**: Helps maintain momentum on goals and routines.
-
-### 3. 💻 Coding & Tech Co-pilot
-- **Pair Programming**: Assistance with code architecture, debugging, refactoring, and scripting.
-- **Workflow Automation**: Scripts and tools to automate repetitive computer tasks.
-- **Research & Learning**: Summarizes documentation, technical articles, and novel concepts quickly.
-
-### 4. 🔒 Privacy & Personalization
-- **Tailored for Gowtham**: Built strictly around Gowtham's habits, taste, and workflow.
-- **Local & Secure First**: Keeps personal data, logs, and sensitive notes protected.
+### Core Components
+- **Agent System:** Core loop (Understand → Plan → Execute → Observe → Verify)
+- **AI Abstraction:** Provider-agnostic interface (currently using OllamaProvider)
+- **Memory Manager:** AI-powered memory extraction (preferences, facts, workflows) with short-term (context) and long-term (pgvector) storage.
+- **Tool Registry:** Extensible self-describing tool interface
+- **Capability Stubs:** Placeholders for the future self-extending capability factory, sandbox, and validator.
 
 ---
 
-## 🗺️ Project Roadmap
+## 🚀 Getting Started (Development)
 
-- [x] **Phase 1: Project Identity & Blueprint** — Define persona, core concepts, and project scope.
-- [ ] **Phase 2: Core Engine Setup** — Set up LLM backend, conversational interface, and local state management.
-- [ ] **Phase 3: Tools & Integration** — Add system tools (calendar, notes, file system, web search).
-- [ ] **Phase 4: Memory & Personalization** — Implement long-term vector/key-value memory for user preferences and context.
-- [ ] **Phase 5: Voice & Interactive UI** — Build a sleek UI and voice interaction for hands-free assistance.
+### 1. Prerequisites
+- Docker & Docker Compose
+- Python 3.13+
+- Ollama (running locally with `qwen2.5:3b` installed)
 
----
-
-## 🚀 Getting Started
+### 2. Setup
 
 ```bash
 # Clone the repository
 git clone https://github.com/Rtr-k-gowtham/mrgreen.git
-
-# Navigate into the project folder
 cd mrgreen
+
+# Start the PostgreSQL database
+docker-compose up -d
+
+# Set up Python environment
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# (Edit .env if needed, though defaults work for local dev)
+
+# Run the API server
+uvicorn app.main:app --reload
+```
+
+### 3. Usage
+
+Check API Health:
+```bash
+curl http://localhost:8000/health
+```
+
+Chat with MR.GREEN:
+```bash
+curl -X POST http://localhost:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello MR.GREEN, I prefer concise answers."}'
 ```
 
 ---
 
-## 💚 Created with Passion
+## 🔒 Security Model
 
-Designed and developed with care by **Gowtham** for **Green**.
+Security is mandatory. MR.GREEN operates under strict boundaries:
+- **No root access:** Dedicated user environment
+- **Tool Permissions:** Explicit approval required for dangerous operations
+- **Sandbox Execution:** (Planned) All newly generated code will run in isolated sandboxes before deployment.
+
+---
+
+## 🗺️ Roadmap
+
+- [x] **Milestone 1:** Foundation (FastAPI, Ollama integration, Basic Memory, Agent Loop)
+- [ ] **Milestone 2:** Built-in Tools (Filesystem, Web Search, Shell Execution)
+- [ ] **Milestone 3:** Capability Factory (Self-extending code generation and testing)
+- [ ] **Milestone 4:** Frontend UI (React + Vite)
+- [ ] **Milestone 5:** Voice Interaction
+
+---
+*Created with passion by Gowtham for MR.GREEN.*
