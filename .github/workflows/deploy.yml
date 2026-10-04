@@ -1,0 +1,30 @@
+name: 🚀 Auto Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🌐 Execute Deployment on VPS via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          script: |
+            TARGET_DIR="${{ secrets.VPS_PATH || '/opt/mrgreen' }}"
+            if [ ! -d "$TARGET_DIR" ]; then
+              echo "Error: Directory $TARGET_DIR does not exist. Please clone the repository first."
+              exit 1
+            fi
+            cd "$TARGET_DIR"
+            chmod +x scripts/deploy.sh
+            bash scripts/deploy.sh
