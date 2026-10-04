@@ -49,6 +49,15 @@ docker compose up -d --build --remove-orphans
 echo "🧹 Cleaning up unused Docker images..."
 docker image prune -f
 
+# Ensure port 8000 is open in firewall for mobile browser access
+if command -v ufw > /dev/null 2>&1; then
+  echo "🔓 Ensuring firewall allows port 8000 for mobile web access..."
+  ufw allow 8000/tcp || true
+fi
+if command -v iptables > /dev/null 2>&1; then
+  iptables -I INPUT -p tcp --dport 8000 -j ACCEPT || true
+fi
+
 # Verify backend health
 echo "🩺 Waiting for service healthcheck..."
 MAX_RETRIES=15
