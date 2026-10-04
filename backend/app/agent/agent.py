@@ -254,6 +254,7 @@ class Agent:
                 output_data={"reasoning": plan.reasoning},
             )
             self.db.add(step)
+            await self.db.flush()
 
             if plan.is_simple_response:
                 # Step 2: Execute — generate AI response
@@ -283,6 +284,7 @@ class Agent:
                     success=True,
                 )
                 self.db.add(response_step)
+                await self.db.flush()
 
                 return response
 
@@ -298,6 +300,7 @@ class Agent:
                             input_data=action.tool_args or {},
                         )
                         self.db.add(tool_step)
+                        await self.db.flush()
 
                         tool_res = await self.executor.execute_tool(
                             tool_name=action.tool_name,
@@ -336,6 +339,7 @@ class Agent:
                             success=True,
                         )
                         self.db.add(final_step)
+                        await self.db.flush()
 
                         return response
 

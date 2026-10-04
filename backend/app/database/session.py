@@ -67,6 +67,14 @@ async def init_db() -> None:
             "ALTER TABLE agent_steps ADD COLUMN IF NOT EXISTS tool_name VARCHAR(100);",
             "ALTER TABLE agent_steps ADD COLUMN IF NOT EXISTS success BOOLEAN;",
             "ALTER TABLE agent_steps ADD COLUMN IF NOT EXISTS duration_ms INTEGER;",
+            "ALTER TABLE tool_calls ADD COLUMN IF NOT EXISTS conversation_id VARCHAR(26);",
+            "ALTER TABLE tool_calls ADD COLUMN IF NOT EXISTS agent_run_id VARCHAR(26);",
+            "ALTER TABLE tool_calls ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'completed';",
+            "ALTER TABLE tools ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'general';",
+            "ALTER TABLE tools ADD COLUMN IF NOT EXISTS version VARCHAR(20) DEFAULT '1.0.0';",
+            "ALTER TABLE tools ADD COLUMN IF NOT EXISTS risk_level VARCHAR(20) DEFAULT 'low';",
+            "ALTER TABLE tools ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE tools ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();",
         ]
 
         for stmt in migrations:

@@ -174,7 +174,7 @@ class ToolExecutor:
                 )
                 db_session.add(pending_call)
                 try:
-                    await db_session.commit()
+                    await db_session.flush()
                 except Exception as e:
                     logger.error("Failed to record pending approval in DB: %s", str(e))
 
@@ -247,7 +247,7 @@ class ToolExecutor:
                     created_at=datetime.now(timezone.utc),
                 )
                 db_session.add(call_record)
-                await db_session.commit()
+                await db_session.flush()
             except Exception as e:
                 logger.error("Failed to record ToolCall audit log: %s", str(e))
 
