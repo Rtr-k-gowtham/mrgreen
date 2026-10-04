@@ -83,6 +83,7 @@ export const App: React.FC = () => {
             isListening={stt.isListening || voiceState === 'LISTENING' || voiceState === 'USER_SPEAKING'}
             isSpeaking={tts.isSpeaking || voiceState === 'ASSISTANT_SPEAKING'}
             isProcessing={isProcessing || voiceState === 'THINKING'}
+            interimTranscript={stt.interimTranscript}
             voiceState={voiceState}
             speechSupported={stt.isSupported}
             onToggleListen={handleToggleListening}

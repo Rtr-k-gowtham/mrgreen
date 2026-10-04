@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { SupportedLanguage } from '../types/voice';
 
-// Type definitions for Web Speech API
 interface SpeechRecognitionErrorEvent extends Event {
   error: string;
   message?: string;
@@ -28,7 +27,7 @@ export function useSpeechRecognition({
   onFinalResult,
   onError,
 }: UseSpeechRecognitionOptions = {}) {
-  const [isSupported, setIsSupported] = useState<boolean>(false);
+  const [isSupported, setIsSupported] = useState<boolean>(true);
   const [isListening, setIsListening] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<string>('');
   const [interimTranscript, setInterimTranscript] = useState<string>('');
@@ -36,44 +35,91 @@ export function useSpeechRecognition({
 
   const recognitionRef = useRef<any>(null);
   const isStoppingExplicitly = useRef<boolean>(false);
+  const latestTranscriptRef = useRef<string>('');
+  const hasSubmittedRef = useRef<boolean>(false);
+  const silenceTimerRef = useRef<any>(null);
+  const onFinalResultRef = useRef(onFinalResult);
+  const onErrorRef = useRef(onError);
+
+  onFinalResultRef.current = onFinalResult;
+  onErrorRef.current = onError;
 
   // Detect support on mount
   useEffect(() => {
     const win = typeof window !== 'undefined' ? (window as IWindow) : null;
-    const SpeechRecognitionClass = win?.SpeechRecognition || win?.webkitSpeechRecognition;
+    const hasSpeechClass = Boolean(win?.SpeechRecognition || win?.webkitSpeechRecognition);
+    const hasMediaDevices = Boolean(navigator?.mediaDevices?.getUserMedia);
+    setIsSupported(hasSpeechClass || hasMediaDevices);
+  }, []);
 
-    if (SpeechRecognitionClass) {
-      setIsSupported(true);
-    } else {
-      setIsSupported(false);
+  // Helper to commit and submit final transcript
+  const commitAndSubmitTranscript = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+
+    const textToSubmit = (latestTranscriptRef.current || '').trim();
+    if (textToSubmit && !hasSubmittedRef.current) {
+      hasSubmittedRef.current = true;
+      setTranscript(textToSubmit);
+      setInterimTranscript('');
+      onFinalResultRef.current?.(textToSubmit);
     }
   }, []);
 
   const stopListening = useCallback(() => {
-    if (recognitionRef.current && isListening) {
-      isStoppingExplicitly.current = true;
+    isStoppingExplicitly.current = true;
+    commitAndSubmitTranscript();
+
+    if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
       } catch {
-        // Recognition might already be stopped
+        // Ignore
       }
-      setIsListening(false);
     }
-  }, [isListening]);
+    setIsListening(false);
+  }, [commitAndSubmitTranscript]);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     setError(null);
     setTranscript('');
     setInterimTranscript('');
+    latestTranscriptRef.current = '';
+    hasSubmittedRef.current = false;
     isStoppingExplicitly.current = false;
+
+    // 1. Explicitly prompt / verify microphone permission
+    if (navigator?.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Immediately release stream so SpeechRecognition can take audio device
+        stream.getTracks().forEach((track) => track.stop());
+      } catch (permErr: any) {
+        if (
+          permErr.name === 'NotAllowedError' ||
+          permErr.name === 'PermissionDeniedError' ||
+          permErr.message?.includes('denied')
+        ) {
+          const err = 'Microphone permission denied. Please allow microphone access in your browser.';
+          setError(err);
+          onErrorRef.current?.(err);
+          setIsListening(false);
+          return;
+        }
+      }
+    }
 
     const win = typeof window !== 'undefined' ? (window as IWindow) : null;
     const SpeechRecognitionClass = win?.SpeechRecognition || win?.webkitSpeechRecognition;
 
     if (!SpeechRecognitionClass) {
-      const err = 'Speech recognition is not supported in this browser. Please use text input.';
+      const err =
+        'Speech recognition is not supported natively in this browser. Please use Chrome, Edge, or Safari, or type your message.';
       setError(err);
-      onError?.(err);
+      onErrorRef.current?.(err);
+      setIsListening(false);
       return;
     }
 
@@ -88,9 +134,15 @@ export function useSpeechRecognition({
       }
 
       const recognition = new SpeechRecognitionClass();
-      recognition.lang = language;
+
+      // Resolve language
+      let targetLang = language;
+      if (targetLang === 'auto') {
+        targetLang = (navigator?.language as any) || 'en-US';
+      }
+      recognition.lang = targetLang;
       recognition.interimResults = true;
-      recognition.continuous = false;
+      recognition.continuous = true; // Stay listening until silence or user pause
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
@@ -104,7 +156,7 @@ export function useSpeechRecognition({
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           const result = event.results[i];
-          const text = result[0].transcript;
+          const text = result[0]?.transcript || '';
 
           if (result.isFinal) {
             final += text;
@@ -113,15 +165,35 @@ export function useSpeechRecognition({
           }
         }
 
-        if (interim) {
-          setInterimTranscript(interim);
-        }
-
         if (final) {
           const trimmedFinal = final.trim();
+          latestTranscriptRef.current = trimmedFinal;
           setTranscript(trimmedFinal);
           setInterimTranscript('');
-          onFinalResult?.(trimmedFinal);
+          commitAndSubmitTranscript();
+          return;
+        }
+
+        const currentPhrase = interim.trim();
+        if (currentPhrase) {
+          latestTranscriptRef.current = currentPhrase;
+          setInterimTranscript(currentPhrase);
+
+          // Reset silence debounce timer: 1.5 seconds of silence automatically commits and sends
+          if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+          }
+          silenceTimerRef.current = setTimeout(() => {
+            if (!isStoppingExplicitly.current) {
+              commitAndSubmitTranscript();
+              try {
+                recognition.stop();
+              } catch {
+                // ignore
+              }
+              setIsListening(false);
+            }
+          }, 1500);
         }
       };
 
@@ -133,23 +205,32 @@ export function useSpeechRecognition({
             errorMessage = 'Microphone permission denied. Please allow microphone access.';
             break;
           case 'no-speech':
-            errorMessage = 'No speech detected. Please try again.';
+            // No speech within recognition interval; if we have accumulated words, submit them
+            if (latestTranscriptRef.current) {
+              commitAndSubmitTranscript();
+              setIsListening(false);
+              return;
+            }
+            errorMessage = 'No speech detected. Please speak clearly into your microphone.';
             break;
           case 'network':
-            errorMessage = 'Network error during speech recognition.';
+            errorMessage = 'Network error during speech recognition. Check your internet connection.';
             break;
           case 'aborted':
-            return; // Normal abort, no need to alert
+            return;
           default:
-            errorMessage = `Voice recognition error: ${event.error}`;
+            errorMessage = `Voice recognition: ${event.error}`;
         }
 
         setError(errorMessage);
-        onError?.(errorMessage);
+        onErrorRef.current?.(errorMessage);
         setIsListening(false);
       };
 
       recognition.onend = () => {
+        if (!isStoppingExplicitly.current) {
+          commitAndSubmitTranscript();
+        }
         setIsListening(false);
       };
 
@@ -158,14 +239,17 @@ export function useSpeechRecognition({
     } catch (e: any) {
       const err = e?.message || 'Failed to start microphone.';
       setError(err);
-      onError?.(err);
+      onErrorRef.current?.(err);
       setIsListening(false);
     }
-  }, [language, onFinalResult, onError]);
+  }, [language, commitAndSubmitTranscript]);
 
   // Clean up on unmount
   useEffect(() => {
     return () => {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+      }
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
@@ -187,6 +271,8 @@ export function useSpeechRecognition({
     resetTranscript: () => {
       setTranscript('');
       setInterimTranscript('');
+      latestTranscriptRef.current = '';
+      hasSubmittedRef.current = false;
     },
   };
 }

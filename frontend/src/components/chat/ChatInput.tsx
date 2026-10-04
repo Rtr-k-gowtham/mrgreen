@@ -7,6 +7,7 @@ interface ChatInputProps {
   isListening: boolean;
   isSpeaking: boolean;
   isProcessing: boolean;
+  interimTranscript?: string;
   voiceState?: VoiceState;
   speechSupported: boolean;
   onToggleListen: () => void;
@@ -23,6 +24,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isListening,
   isSpeaking,
   isProcessing,
+  interimTranscript = '',
   voiceState: _voiceState,
   speechSupported,
   onToggleListen,
@@ -174,19 +176,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <button
           type="button"
           onClick={onToggleListen}
-          disabled={disabled || !speechSupported}
+          disabled={disabled}
           aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
           title={
             !speechSupported
-              ? 'Speech recognition unavailable'
+              ? 'Click to start microphone input'
               : isListening
               ? 'Listening... tap to stop'
               : 'Tap to speak to MR.GREEN'
           }
           className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-300 ${
-            !speechSupported
-              ? 'bg-zinc-900 text-zinc-600 cursor-not-allowed border border-zinc-800'
-              : isListening
+            isListening
               ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/50 scale-105 border border-emerald-400 animate-pulse'
               : 'bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-400 border border-emerald-500/30 hover:border-emerald-400/60 active:scale-95'
           }`}
@@ -205,11 +205,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               onClick={onToggleListen}
               className="w-full bg-[#08100b] border border-emerald-500/50 rounded-2xl px-4 py-2.5 text-sm text-emerald-300 flex items-center justify-between cursor-pointer shadow-inner shadow-emerald-950/60 animate-pulse"
             >
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span className="font-mono text-xs text-emerald-300">Listening... Speak naturally</span>
+              <div className="flex items-center gap-2 overflow-hidden mr-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
+                <span className="font-mono text-xs text-emerald-300 truncate">
+                  {interimTranscript || 'Listening... Speak naturally'}
+                </span>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/40">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/40 flex-shrink-0">
                 TAP TO STOP
               </span>
             </div>
