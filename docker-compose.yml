@@ -20,8 +20,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - mrgreen_network
 
   backend:
     build:
@@ -29,30 +27,22 @@ services:
       dockerfile: Dockerfile
     container_name: mrgreen-backend
     restart: unless-stopped
+    network_mode: host
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "${APP_PORT:-8000}:8000"
     environment:
       APP_ENV: ${APP_ENV:-production}
       APP_DEBUG: ${APP_DEBUG:-false}
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mrgreen}:${POSTGRES_PASSWORD:-mrgreen_dev_password}@postgres:5432/${POSTGRES_DB:-mrgreen_db}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      APP_HOST: 0.0.0.0
+      APP_PORT: ${APP_PORT:-8000}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mrgreen}:${POSTGRES_PASSWORD:-mrgreen_dev_password}@127.0.0.1:5432/${POSTGRES_DB:-mrgreen_db}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://127.0.0.1:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
       OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-qwen2.5:3b}
       SECRET_KEY: ${SECRET_KEY:-change-me-to-a-random-secret-key}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    extra_hosts:
-      # Allows backend container to connect to Ollama running directly on VPS host
-      - "host.docker.internal:host-gateway"
-    networks:
-      - mrgreen_network
 
 volumes:
   mrgreen_pgdata:
     driver: local
-
-networks:
-  mrgreen_network:
-    driver: bridge
