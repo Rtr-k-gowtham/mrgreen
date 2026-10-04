@@ -1,9 +1,6 @@
-# MR.GREEN — Development Services
-# ==================================
-# Run: docker-compose up -d
-# This starts PostgreSQL with pgvector for local development.
-
-version: "3.9"
+# MR.GREEN — Production & Development Services
+# ============================================
+# Run: docker compose up -d --build
 
 services:
   postgres:
@@ -11,19 +8,51 @@ services:
     container_name: mrgreen-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: mrgreen
-      POSTGRES_PASSWORD: mrgreen_dev_password
-      POSTGRES_DB: mrgreen_db
+      POSTGRES_USER: ${POSTGRES_USER:-mrgreen}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mrgreen_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-mrgreen_db}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - mrgreen_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mrgreen -d mrgreen_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mrgreen} -d ${POSTGRES_DB:-mrgreen_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - mrgreen_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mrgreen-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mrgreen}:${POSTGRES_PASSWORD:-mrgreen_dev_password}@postgres:5432/${POSTGRES_DB:-mrgreen_db}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-qwen2.5:3b}
+      SECRET_KEY: ${SECRET_KEY:-change-me-to-a-random-secret-key}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    extra_hosts:
+      # Allows backend container to connect to Ollama running directly on VPS host
+      - "host.docker.internal:host-gateway"
+    networks:
+      - mrgreen_network
 
 volumes:
   mrgreen_pgdata:
     driver: local
+
+networks:
+  mrgreen_network:
+    driver: bridge
