@@ -32,6 +32,14 @@ echo "📥 Pulling latest changes from origin/main..."
 git fetch origin main
 git reset --hard origin/main
 
+# Build frontend if node/npm is installed on the host
+if command -v npm > /dev/null 2>&1 && [ -d "frontend" ]; then
+  echo "📦 Building frontend application..."
+  (cd frontend && npm install && npm run build) || true
+  mkdir -p backend/static
+  cp -r frontend/dist/* backend/static/ || true
+fi
+
 # Rebuild and restart containers
 echo "🐳 Rebuilding and starting Docker services..."
 docker compose pull || true

@@ -76,6 +76,7 @@ def create_app() -> FastAPI:
             "http://127.0.0.1:5173",
             "http://127.0.0.1:3000",
         ],
+        allow_origin_regex=r"^https?://.*$",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -101,6 +102,19 @@ def create_app() -> FastAPI:
     app.include_router(capabilities_router, tags=["Capabilities"])
     app.include_router(agent_runs_router, tags=["Agent Runs"])
     app.include_router(approvals_router, tags=["Approvals"])
+
+    # Mount frontend static files if available (serves PWA mobile interface)
+    static_dirs = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static")),
+        "/app/static",
+    ]
+    for s_dir in static_dirs:
+        if os.path.isdir(s_dir) and os.path.exists(os.path.join(s_dir, "index.html")):
+            logger.info("Serving frontend static files from: %s", s_dir)
+            from fastapi.staticfiles import StaticFiles
+            app.mount("/", StaticFiles(directory=s_dir, html=True), name="frontend")
+            break
 
     return app
 
