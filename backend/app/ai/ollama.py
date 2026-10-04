@@ -197,12 +197,13 @@ class OllamaProvider(AIProvider):
                 "available_models": models,
             }
         except Exception as e:
+            err_msg = str(e) or repr(e)
             return {
                 "status": "unhealthy",
                 "provider": "ollama",
                 "base_url": self.base_url,
                 "model": self.model,
-                "error": str(e),
+                "error": f"{type(e).__name__}: {err_msg}" if str(e) else repr(e),
             }
 
     async def list_models(self) -> list[str]:
