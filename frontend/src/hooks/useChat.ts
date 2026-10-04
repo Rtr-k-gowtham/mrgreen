@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChatMessage, ToolActivity } from '../types/chat';
-import { OrbState, SupportedLanguage } from '../types/voice';
+import { VoiceProfileId, VoiceState, SupportedLanguage } from '../types/voice';
 import { api } from '../services/api';
+import { VoiceSocketClient } from '../services/voiceSocket';
 import { useSpeechRecognition } from './useSpeechRecognition';
 import { useSpeechSynthesis } from './useSpeechSynthesis';
 
@@ -11,20 +12,22 @@ export function useChat() {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
-  const [orbState, setOrbState] = useState<OrbState>('IDLE');
-  const [activeLanguage, setActiveLanguage] = useState<SupportedLanguage>('en-IN');
+  const [voiceState, setVoiceState] = useState<VoiceState>('IDLE');
+  const [activeLanguage, setActiveLanguage] = useState<SupportedLanguage>('auto');
+  const [activeVoiceProfile, setActiveVoiceProfile] = useState<VoiceProfileId>('GREEN_DEFAULT');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const tts = useSpeechSynthesis({
-    defaultLanguage: activeLanguage,
+    defaultLanguage: activeLanguage === 'auto' ? 'en-IN' : activeLanguage,
     autoSpeak: true,
   });
 
   const sendMessageRef = useRef<(text: string) => Promise<void>>();
+  const socketRef = useRef<VoiceSocketClient | null>(null);
 
   // Speech Recognition hook
   const stt = useSpeechRecognition({
-    language: activeLanguage,
+    language: activeLanguage === 'auto' ? 'en-IN' : activeLanguage,
     onFinalResult: (finalText) => {
       if (finalText.trim() && sendMessageRef.current) {
         sendMessageRef.current(finalText.trim());
@@ -32,9 +35,9 @@ export function useChat() {
     },
     onError: (err) => {
       setErrorMessage(err);
-      setOrbState('ERROR');
+      setVoiceState('ERROR');
       setTimeout(() => {
-        setOrbState('IDLE');
+        setVoiceState('IDLE');
       }, 3000);
     },
   });
@@ -42,8 +45,61 @@ export function useChat() {
   // Sync language with TTS and STT
   const handleLanguageChange = (lang: SupportedLanguage) => {
     setActiveLanguage(lang);
-    tts.setLanguage(lang);
+    if (lang !== 'auto') {
+      tts.setLanguage(lang);
+    }
   };
+
+  // Immediate Barge-in / Interruption
+  const interrupt = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.interrupt();
+    }
+    tts.stop();
+    setVoiceState('INTERRUPTED');
+    setTimeout(() => {
+      setVoiceState('LISTENING');
+    }, 100);
+  }, [tts]);
+
+  // Initialize VoiceSocketClient for real-time WebSocket connection
+  useEffect(() => {
+    const client = new VoiceSocketClient({
+      onStateChange: (state) => {
+        setVoiceState(state);
+      },
+      onPartialTranscript: (_text) => {
+        // Can be displayed in input or HUD
+      },
+      onFinalTranscript: (text) => {
+        if (text.trim() && sendMessageRef.current) {
+          sendMessageRef.current(text.trim());
+        }
+      },
+      onResponseDelta: (_delta) => {
+        // Live streaming text updates
+      },
+      onResponseDone: (data) => {
+        if (data.conversation_id) {
+          setConversationId(data.conversation_id);
+        }
+      },
+      onInterrupted: () => {
+        setVoiceState('INTERRUPTED');
+        setTimeout(() => setVoiceState('LISTENING'), 150);
+      },
+      onError: (err) => {
+        setErrorMessage(err);
+      },
+    });
+
+    socketRef.current = client;
+    client.connect(conversationId || undefined, activeVoiceProfile, activeLanguage);
+
+    return () => {
+      client.disconnect();
+    };
+  }, [conversationId, activeVoiceProfile, activeLanguage]);
 
   // Health check polling
   const checkConnection = useCallback(async () => {
@@ -52,12 +108,12 @@ export function useChat() {
       const online = health.status === 'healthy' || health.status === 'ok';
       setIsOnline(online);
       if (!online) {
-        setOrbState('OFFLINE');
+        setVoiceState('OFFLINE');
       }
       return online;
     } catch {
       setIsOnline(false);
-      setOrbState('OFFLINE');
+      setVoiceState('OFFLINE');
       return false;
     }
   }, []);
@@ -68,22 +124,24 @@ export function useChat() {
     return () => clearInterval(interval);
   }, [checkConnection]);
 
-  // Update Orb State dynamically based on system activities
+  // Derive dynamic state from microphone / speech activities if socket is idle
   useEffect(() => {
     if (!isOnline) {
-      setOrbState('OFFLINE');
+      setVoiceState('OFFLINE');
     } else if (errorMessage) {
-      setOrbState('ERROR');
+      setVoiceState('ERROR');
     } else if (stt.isListening) {
-      setOrbState('LISTENING');
+      setVoiceState('LISTENING');
     } else if (tts.isSpeaking) {
-      setOrbState('SPEAKING');
+      setVoiceState('ASSISTANT_SPEAKING');
     } else if (activeTool) {
-      setOrbState('TOOL_EXECUTION');
+      setVoiceState('TOOL_EXECUTING');
     } else if (isProcessing) {
-      setOrbState('THINKING');
+      setVoiceState('THINKING');
+    } else if (voiceState === 'CONNECTING' || voiceState === 'CONNECTED') {
+      // keep current socket state
     } else {
-      setOrbState('IDLE');
+      setVoiceState('IDLE');
     }
   }, [isOnline, errorMessage, stt.isListening, tts.isSpeaking, activeTool, isProcessing]);
 
@@ -92,8 +150,8 @@ export function useChat() {
     async (text: string) => {
       if (!text.trim()) return;
 
-      // Stop any current speech
-      tts.stop();
+      // Barge-in: Stop any current speech immediately
+      interrupt();
       stt.stopListening();
       setErrorMessage(null);
 
@@ -108,6 +166,7 @@ export function useChat() {
 
       setMessages((prev) => [...prev, userMessage]);
       setIsProcessing(true);
+      setVoiceState('THINKING');
 
       try {
         const response = await api.sendChatMessage({
@@ -115,7 +174,6 @@ export function useChat() {
           conversation_id: conversationId || undefined,
         });
 
-        // Update active conversation ID
         if (response.conversation_id) {
           setConversationId(response.conversation_id);
         }
@@ -156,14 +214,16 @@ export function useChat() {
         setMessages((prev) => [...prev, assistantMessage]);
         setIsProcessing(false);
         setActiveTool(null);
+        setVoiceState('ASSISTANT_SPEAKING');
 
-        // Speak the assistant's response via TTS
+        // Play assistant speech
         if (tts.voiceEnabled) {
           tts.speak(response.response);
         }
       } catch (err: unknown) {
         setIsProcessing(false);
         setActiveTool(null);
+        setVoiceState('ERROR');
         const errorText = err instanceof Error ? err.message : 'MR.GREEN encountered an error.';
         setErrorMessage(errorText);
 
@@ -177,24 +237,24 @@ export function useChat() {
         setMessages((prev) => [...prev, errorMsg]);
       }
     },
-    [conversationId, tts, stt]
+    [conversationId, tts, stt, interrupt]
   );
 
   sendMessageRef.current = sendMessage;
 
   const startNewChat = useCallback(() => {
-    tts.stop();
+    interrupt();
     stt.stopListening();
     setMessages([]);
     setConversationId(null);
     setErrorMessage(null);
     setActiveTool(null);
-    setOrbState('IDLE');
-  }, [tts, stt]);
+    setVoiceState('IDLE');
+  }, [interrupt, stt]);
 
   const loadConversation = useCallback(
     async (id: string) => {
-      tts.stop();
+      interrupt();
       stt.stopListening();
       setErrorMessage(null);
       setIsProcessing(true);
@@ -215,13 +275,13 @@ export function useChat() {
           }));
           setMessages(mappedMessages);
         }
-      } catch (err) {
+      } catch {
         setErrorMessage('Failed to load conversation history.');
       } finally {
         setIsProcessing(false);
       }
     },
-    [tts, stt]
+    [interrupt, stt]
   );
 
   return {
@@ -230,12 +290,16 @@ export function useChat() {
     isOnline,
     isProcessing,
     activeTool,
-    orbState,
+    voiceState,
+    orbState: voiceState, // backwards compatibility
     errorMessage,
     activeLanguage,
+    activeVoiceProfile,
+    setActiveVoiceProfile,
     setActiveLanguage: handleLanguageChange,
     stt,
     tts,
+    interrupt,
     sendMessage,
     startNewChat,
     loadConversation,

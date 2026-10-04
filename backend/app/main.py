@@ -92,6 +92,7 @@ def create_app() -> FastAPI:
     from app.api.routes.capabilities import router as capabilities_router
     from app.api.routes.agent_runs import router as agent_runs_router
     from app.api.routes.approvals import router as approvals_router
+    from app.voice.websocket import router as voice_router
 
     app.include_router(health_router, tags=["Health"])
     app.include_router(chat_router, tags=["Chat"])
@@ -102,6 +103,7 @@ def create_app() -> FastAPI:
     app.include_router(capabilities_router, tags=["Capabilities"])
     app.include_router(agent_runs_router, tags=["Agent Runs"])
     app.include_router(approvals_router, tags=["Approvals"])
+    app.include_router(voice_router, tags=["Voice"])
 
     # Mount frontend static files if available (serves PWA mobile interface)
     static_dirs = [

@@ -51,6 +51,15 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # Voice & CosyVoice Configuration
+    cosyvoice_enabled: bool = True
+    cosyvoice_model_path: str = "/models/cosyvoice"
+    cosyvoice_reference_audio: str = "/models/voices/green.wav"
+    cosyvoice_reference_text: str = ""
+    cosyvoice_device: str = "auto"
+    cosyvoice_sample_rate: int = 22050
+    default_voice_profile: str = "GREEN_DEFAULT"
+
     @property
     def is_development(self) -> bool:
         return self.app_env == "development"

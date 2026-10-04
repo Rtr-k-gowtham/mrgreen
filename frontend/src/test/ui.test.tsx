@@ -136,7 +136,7 @@ describe('UI — Chat Input & Voice Controls', () => {
       />
     );
 
-    const input = screen.getByPlaceholderText('Type a message...');
+    const input = screen.getByLabelText('Type message to MR.GREEN');
     fireEvent.change(input, { target: { value: 'Hello MR.GREEN' } });
 
     const sendBtn = screen.getByRole('button', { name: /send message/i });
