@@ -4,6 +4,9 @@
 # ==============================================================================
 set -e
 
+# Ensure standard system PATH is loaded for non-login/SSH shells
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
 echo "🌿 [MR.GREEN] Starting Deployment..."
 
 # Navigate to project root directory
