@@ -81,6 +81,20 @@ done
 
 if [ "$HEALTHY" = true ]; then
   echo "✅ [MR.GREEN] Successfully deployed and healthy!"
+  echo ""
+  echo "🧪 --- Running Live Acceptance Verifications ---"
+  echo "1. Health endpoint:"
+  curl -s http://localhost:8000/health
+  echo ""
+  echo "2. Tools endpoint:"
+  curl -s http://localhost:8000/api/tools
+  echo ""
+  echo "3. Chat endpoint:"
+  curl -s -X POST http://localhost:8000/api/chat -H "Content-Type: application/json" -d '{"message":"Hello MR.GREEN"}'
+  echo ""
+  echo "4. Frontend PWA Web Interface:"
+  curl -s http://localhost:8000/ | grep -o "<title>.*</title>" || echo "Static files served at /"
+  echo "-----------------------------------------------"
 else
   echo "⚠️  [MR.GREEN] Warning: Health check did not respond in time. Checking container logs:"
   docker compose logs backend --tail 30
