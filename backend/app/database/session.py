@@ -46,11 +46,34 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Create all tables. Used during application startup."""
+    """Create all tables and apply incremental column migrations."""
     from app.database.models import Base
+    from sqlalchemy import text
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        # Automatic schema synchronization for incremental columns added across milestones
+        migrations = [
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS goal TEXT;",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS current_step INTEGER DEFAULT 0;",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS total_steps INTEGER DEFAULT 0;",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS iterations INTEGER DEFAULT 0;",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS trigger_message_id VARCHAR(26);",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS error_message TEXT;",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';",
+            "ALTER TABLE agent_steps ADD COLUMN IF NOT EXISTS input_data JSONB DEFAULT '{}';",
+            "ALTER TABLE agent_steps ADD COLUMN IF NOT EXISTS output_data JSONB DEFAULT '{}';",
+            "ALTER TABLE agent_steps ADD COLUMN IF NOT EXISTS tool_name VARCHAR(100);",
+            "ALTER TABLE agent_steps ADD COLUMN IF NOT EXISTS success BOOLEAN;",
+            "ALTER TABLE agent_steps ADD COLUMN IF NOT EXISTS duration_ms INTEGER;",
+        ]
+
+        for stmt in migrations:
+            try:
+                await conn.execute(text(stmt))
+            except Exception:
+                pass
 
 
 async def close_db() -> None:

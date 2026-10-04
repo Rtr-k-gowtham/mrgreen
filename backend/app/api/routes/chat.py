@@ -87,7 +87,7 @@ async def chat(
         logger.error("Chat endpoint error processing message: %s", str(e), exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"{type(e).__name__}: {str(e)}",
+            detail="MR.GREEN encountered an issue while generating a response. Please try again.",
         )
 
     return ChatResponse(
