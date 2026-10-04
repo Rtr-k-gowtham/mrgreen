@@ -58,6 +58,36 @@ if command -v iptables > /dev/null 2>&1; then
   iptables -I INPUT -p tcp --dport 8000 -j ACCEPT || true
 fi
 
+# Configure Nginx reverse proxy on port 80 to route public web & mobile requests to MR.GREEN
+if command -v nginx > /dev/null 2>&1 && [ -d "/etc/nginx" ]; then
+  echo "🌐 Configuring Nginx reverse proxy for MR.GREEN on port 80..."
+  mkdir -p /etc/nginx/conf.d
+  cat > /etc/nginx/conf.d/mrgreen.conf << 'EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+  if [ -f /etc/nginx/sites-enabled/default ]; then
+    rm -f /etc/nginx/sites-enabled/default || true
+  fi
+  nginx -t && (systemctl reload nginx || service nginx reload) || echo "Nginx reload skipped"
+fi
+
 # Verify backend health
 echo "🩺 Waiting for service healthcheck..."
 MAX_RETRIES=15
