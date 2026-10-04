@@ -61,6 +61,8 @@ logs/
 
 # Capabilities sandbox
 capabilities/sandbox/
+workspace/*
+!workspace/.gitkeep
 
 # Secrets
 *.pem

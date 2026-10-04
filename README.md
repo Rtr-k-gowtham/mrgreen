@@ -1,94 +1,95 @@
-# MR.GREEN — Autonomous Personal AI Agent
+# 🌿 MR.GREEN — Autonomous Personal AI Agent
 
 > *"More than just code — an intelligent assistant and everyday companion."*
 
-Welcome to **MR.GREEN**, a private, self-hosted, autonomous AI assistant running on my own VPS.
+Welcome to **MR.GREEN**, a private, self-hosted, autonomous AI agent platform running on my own cloud VPS.
 
-Designed as an extensible AI-agent platform from the beginning, MR.GREEN is built to understand natural conversation, learn from interaction, execute tools, and eventually write and deploy its own capabilities.
-
----
-
-## 🏗️ Architecture (Milestone 1)
-
-This repository contains the foundational structure for MR.GREEN.
-
-### Tech Stack
-- **Backend:** Python 3.13+, FastAPI, SQLAlchemy
-- **Database:** PostgreSQL + pgvector (for semantic memory)
-- **AI Engine:** Ollama (qwen2.5:3b) local execution
-
-### Core Components
-- **Agent System:** Core loop (Understand → Plan → Execute → Observe → Verify)
-- **AI Abstraction:** Provider-agnostic interface (currently using OllamaProvider)
-- **Memory Manager:** AI-powered memory extraction (preferences, facts, workflows) with short-term (context) and long-term (pgvector) storage.
-- **Tool Registry:** Extensible self-describing tool interface
-- **Capability Stubs:** Placeholders for the future self-extending capability factory, sandbox, and validator.
+Designed as an extensible AI-agent system from the ground up, MR.GREEN understands natural dialogue, stores semantic context in vector memory, evaluates multi-step plans, executes sandboxed tools with least-privilege security, and features continuous deployment via GitHub Actions.
 
 ---
 
-## 🚀 Getting Started (Development)
+## 🏗️ Architecture & Features
+
+### Core Stack
+- **Backend Framework:** Python 3.12+, FastAPI, SQLAlchemy 2.0 (AsyncIO)
+- **Database:** PostgreSQL 16 + `pgvector` (semantic long-term memory)
+- **Local AI Engine:** Ollama (`qwen2.5:3b`) native execution
+- **CI/CD Pipeline:** Automated GitHub Actions SSH deployment to Ubuntu VPS
+
+### 🛠️ Universal Tool Engine (Milestone 2)
+MR.GREEN incorporates an enterprise-grade Tool Registry and Sandboxed Executor:
+
+| Tool | Category | Risk Level | Description |
+| :--- | :--- | :--- | :--- |
+| **`calculator`** | Math | `low` | Safe AST-based mathematical evaluation (No `eval()`). |
+| **`time`** | System | `low` | Current UTC, server, and timezone information. |
+| **`file_read`** | Filesystem | `low` | Reads workspace files with path traversal safeguards. |
+| **`file_write`** | Filesystem | `medium` | Writes or appends files strictly inside the approved workspace. |
+| **`web_fetch`** | Network | `medium` | Fetches public webpages with SSRF protection against private IPs. |
+| **`shell`** | Shell | `critical` | Sandboxed command execution (**disabled by default**, approval gated). |
+
+### 🔒 Security & Approval System
+- **Deny by Default:** Tools receive only the permissions explicitly granted in their manifest.
+- **SSRF Protection:** Blocks local loopback (`127.0.0.1`), private subnets, and cloud metadata (`169.254.169.254`).
+- **Path Traversal Guards:** Prevents `../` escaping and blocks access to `/root`, `/etc`, and `.env`.
+- **Human Approval Gating:** High and critical risk operations halt execution until approved via `/api/approvals`.
+
+---
+
+## 🚀 Getting Started
 
 ### 1. Prerequisites
 - Docker & Docker Compose
-- Python 3.13+
-- Ollama (running locally with `qwen2.5:3b` installed)
+- Python 3.12+
+- Ollama (running locally with `qwen2.5:3b`)
 
-### 2. Setup
-
+### 2. Running Locally
 ```bash
 # Clone the repository
 git clone https://github.com/Rtr-k-gowtham/mrgreen.git
 cd mrgreen
 
-# Start the PostgreSQL database
-docker-compose up -d
+# Start PostgreSQL with pgvector
+docker compose up -d postgres
 
-# Set up Python environment
+# Setup backend
 cd backend
-python -m venv .venv
-source .venv/bin/activate
 pip install -r requirements.txt
-
-# Configure environment
 cp .env.example .env
-# (Edit .env if needed, though defaults work for local dev)
 
-# Run the API server
+# Run FastAPI server
 uvicorn app.main:app --reload
-```
-
-### 3. Usage
-
-Check API Health:
-```bash
-curl http://localhost:8000/health
-```
-
-Chat with MR.GREEN:
-```bash
-curl -X POST http://localhost:8000/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello MR.GREEN, I prefer concise answers."}'
 ```
 
 ---
 
-## 🔒 Security Model
+## 📡 API Reference
 
-Security is mandatory. MR.GREEN operates under strict boundaries:
-- **No root access:** Dedicated user environment
-- **Tool Permissions:** Explicit approval required for dangerous operations
-- **Sandbox Execution:** (Planned) All newly generated code will run in isolated sandboxes before deployment.
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/health` | `GET` | System health check (API, Database, Ollama status) |
+| `/api/chat` | `POST` | Chat with MR.GREEN (auto-plans tool calls when needed) |
+| `/api/tools` | `GET` | List all registered tools and their schemas |
+| `/api/tools/{name}` | `GET` | Get tool metadata and parameter schema |
+| `/api/tools/{name}/execute` | `POST` | Execute a tool directly with input payload |
+| `/api/tools/{name}/enable` | `POST` | Enable a disabled tool |
+| `/api/tools/{name}/disable` | `POST` | Disable a registered tool |
+| `/api/tool-calls` | `GET` | View audit log of executed tools |
+| `/api/agent/runs` | `GET` | List agent execution runs |
+| `/api/agent/runs/{id}` | `GET` | Inspect full trace of plan, tool steps, and response |
+| `/api/approvals` | `GET` | List pending approval requests |
+| `/api/approvals/{id}/approve` | `POST` | Approve gated tool execution |
+| `/api/approvals/{id}/reject` | `POST` | Reject gated tool execution |
 
 ---
 
 ## 🗺️ Roadmap
 
-- [x] **Milestone 1:** Foundation (FastAPI, Ollama integration, Basic Memory, Agent Loop)
-- [ ] **Milestone 2:** Built-in Tools (Filesystem, Web Search, Shell Execution)
-- [ ] **Milestone 3:** Capability Factory (Self-extending code generation and testing)
-- [ ] **Milestone 4:** Frontend UI (React + Vite)
-- [ ] **Milestone 5:** Voice Interaction
+- [x] **Milestone 1:** Production Foundation (FastAPI, Ollama, pgvector, GitHub Actions CI/CD)
+- [x] **Milestone 2:** Universal Tool Engine, Tool Registry, Executor & Security Sandbox
+- [ ] **Milestone 3:** Capability Factory (Self-extending code generation and sandbox testing)
+- [ ] **Milestone 4:** Frontend UI (React + Vite real-time agent dashboard)
+- [ ] **Milestone 5:** Voice Interaction & Multi-Agent Collaboration
 
 ---
 *Created with passion by Gowtham for MR.GREEN.*

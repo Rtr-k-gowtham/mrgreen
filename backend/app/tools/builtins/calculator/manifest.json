@@ -1,0 +1,20 @@
+{
+  "name": "calculator",
+  "version": "1.0.0",
+  "description": "Perform safe mathematical calculations using an AST-based evaluator",
+  "category": "math",
+  "permissions": [],
+  "risk_level": "low",
+  "requires_approval": false,
+  "enabled": true,
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "expression": {
+        "type": "string",
+        "description": "Mathematical expression to evaluate (e.g. '25 * 4', 'sqrt(144) + 10')"
+      }
+    },
+    "required": ["expression"]
+  }
+}

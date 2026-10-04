@@ -175,7 +175,10 @@ class AgentRun(Base):
     id = Column(String(26), primary_key=True)  # ULID
     conversation_id = Column(String(26), ForeignKey("conversations.id"), nullable=False, index=True)
     trigger_message_id = Column(String(26), nullable=True)
+    goal = Column(Text, nullable=True)
     status = Column(Enum(AgentRunStatus), default=AgentRunStatus.RUNNING, nullable=False)
+    current_step = Column(Integer, default=0)
+    total_steps = Column(Integer, default=0)
     iterations = Column(Integer, default=0)
     max_iterations = Column(Integer, nullable=False)
     started_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -212,7 +215,7 @@ class AgentStep(Base):
 
 
 # ============================================================
-# Tools & Capabilities
+# Tools & Registry
 # ============================================================
 
 class ToolRecord(Base):
@@ -221,14 +224,52 @@ class ToolRecord(Base):
     id = Column(String(26), primary_key=True)  # ULID
     name = Column(String(100), unique=True, nullable=False, index=True)
     description = Column(Text, nullable=False)
+    category = Column(String(50), default="general", nullable=False)
+    version = Column(String(20), default="1.0.0", nullable=False)
     input_schema = Column(JSONB, default=dict)
     permissions = Column(JSONB, default=list)
+    risk_level = Column(String(20), default="low", nullable=False)
+    requires_approval = Column(Boolean, default=False)
     is_builtin = Column(Boolean, default=False)
     is_enabled = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    versions = relationship("ToolVersion", back_populates="tool", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
-        return f"<ToolRecord(name={self.name})>"
+        return f"<ToolRecord(name={self.name}, risk={self.risk_level})>"
+
+
+class ToolVersion(Base):
+    __tablename__ = "tool_versions"
+
+    id = Column(String(26), primary_key=True)  # ULID
+    tool_id = Column(String(26), ForeignKey("tools.id"), nullable=False, index=True)
+    version = Column(String(20), nullable=False)
+    manifest = Column(JSONB, default=dict)
+    status = Column(String(50), default="active")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    tool = relationship("ToolRecord", back_populates="versions")
+
+    def __repr__(self) -> str:
+        return f"<ToolVersion(tool_id={self.tool_id}, version={self.version})>"
+
+
+class ToolPermissionRecord(Base):
+    __tablename__ = "tool_permissions"
+
+    id = Column(String(26), primary_key=True)  # ULID
+    tool_name = Column(String(100), nullable=False, index=True)
+    permission = Column(String(100), nullable=False)
+    allowed = Column(Boolean, default=True)
+    requires_approval = Column(Boolean, default=False)
+
+    def __repr__(self) -> str:
+        return f"<ToolPermissionRecord(tool={self.tool_name}, perm={self.permission})>"
 
 
 class Capability(Base):
@@ -274,16 +315,19 @@ class ToolCall(Base):
 
     id = Column(String(26), primary_key=True)  # ULID
     agent_step_id = Column(String(26), ForeignKey("agent_steps.id"), nullable=True, index=True)
+    conversation_id = Column(String(26), ForeignKey("conversations.id"), nullable=True, index=True)
+    agent_run_id = Column(String(26), ForeignKey("agent_runs.id"), nullable=True, index=True)
     tool_name = Column(String(100), nullable=False, index=True)
     input_data = Column(JSONB, default=dict)
     output_data = Column(JSONB, default=dict)
+    status = Column(String(50), default="completed")  # "completed", "failed", "pending_approval", "rejected"
     success = Column(Boolean, nullable=True)
     error_message = Column(Text, nullable=True)
     duration_ms = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:
-        return f"<ToolCall(id={self.id}, tool={self.tool_name})>"
+        return f"<ToolCall(id={self.id}, tool={self.tool_name}, status={self.status})>"
 
 
 # ============================================================

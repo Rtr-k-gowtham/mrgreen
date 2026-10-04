@@ -284,11 +284,111 @@ class Agent:
 
                 return response
 
-            # TODO: Handle tool calls and multi-step plans in future iterations
+            if plan.has_tool_calls:
+                for action in plan.actions:
+                    if action.action_type == ActionType.TOOL_CALL and action.tool_name:
+                        tool_step = AgentStep(
+                            id=str(ULID()),
+                            agent_run_id=agent_run.id,
+                            step_number=iteration + 1,
+                            action_type="tool_call",
+                            tool_name=action.tool_name,
+                            input_data=action.tool_args or {},
+                        )
+                        self.db.add(tool_step)
+
+                        tool_res = await self.executor.execute_tool(
+                            tool_name=action.tool_name,
+                            arguments=action.tool_args or {},
+                            db_session=self.db,
+                            conversation_id=conversation_id,
+                            agent_run_id=agent_run.id,
+                            agent_step_id=tool_step.id,
+                        )
+
+                        tool_step.output_data = tool_res.output if isinstance(tool_res.output, dict) else {"output": tool_res.output}
+                        tool_step.success = tool_res.success
+                        tool_step.duration_ms = tool_res.duration_ms
+
+                        if not tool_res.success:
+                            if "requires approval" in (tool_res.error or "").lower():
+                                return f"⚠️ This operation requires explicit human approval before execution: {tool_res.error}"
+                            return f"I encountered an error using tool '{action.tool_name}': {tool_res.error}"
+
+                        # Generate informed response incorporating tool results
+                        response = await self._generate_response_with_tool_result(
+                            user_message=user_message,
+                            conversation_id=conversation_id,
+                            tool_name=action.tool_name,
+                            tool_input=action.tool_args or {},
+                            tool_output=tool_res.output,
+                        )
+
+                        # Log final response step
+                        final_step = AgentStep(
+                            id=str(ULID()),
+                            agent_run_id=agent_run.id,
+                            step_number=iteration + 2,
+                            action_type="respond",
+                            output_data={"response_length": len(response), "tool_used": action.tool_name},
+                            success=True,
+                        )
+                        self.db.add(final_step)
+
+                        return response
 
         # If we exhaust all iterations, return a fallback
         logger.warning("Agent exhausted max iterations (%d)", self.max_iterations)
         return "I apologize, but I'm having difficulty processing your request. Could you try rephrasing it?"
+
+    async def _generate_response_with_tool_result(
+        self,
+        user_message: str,
+        conversation_id: str,
+        tool_name: str,
+        tool_input: dict[str, Any],
+        tool_output: Any,
+    ) -> str:
+        """Generate an AI response synthesizing tool execution results."""
+        import json
+
+        # Direct formatters for quick mathematical & time answers
+        if tool_name == "calculator" and isinstance(tool_output, dict):
+            expr = tool_output.get("expression")
+            res = tool_output.get("result")
+            if expr is not None and res is not None:
+                return f"{expr} = {res}"
+
+        if tool_name == "time" and isinstance(tool_output, dict):
+            formatted = tool_output.get("formatted")
+            tz = tool_output.get("timezone", "UTC")
+            return f"The current time is {formatted} ({tz})."
+
+        # General LLM synthesis with memory context
+        memory_context = await self.memory.get_context_for_ai()
+        system_prompt = SYSTEM_PROMPT.format(
+            memory_context=memory_context or "No stored memories yet.",
+            current_date=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        )
+        system_prompt += (
+            f"\n\nYou have just executed the '{tool_name}' tool with input: {json.dumps(tool_input)}.\n"
+            f"Tool Output:\n{json.dumps(tool_output, default=str)}\n\n"
+            "Use this tool output to provide a concise, direct, and helpful answer to the user's question."
+        )
+
+        ai_messages = [
+            AIMessage(role="user", content=user_message),
+        ]
+
+        try:
+            ai_resp = await self.executor.generate_response(
+                messages=ai_messages,
+                system_prompt=system_prompt,
+            )
+            return ai_resp.content
+        except Exception as e:
+            logger.warning("AI synthesis failed, falling back to direct tool output format: %s", str(e))
+            return f"Tool '{tool_name}' result:\n{json.dumps(tool_output, indent=2, default=str)}"
 
     async def _generate_response(
         self,

@@ -1,0 +1,24 @@
+{
+  "name": "file_read",
+  "version": "1.0.0",
+  "description": "Read contents of a file inside the approved MR.GREEN workspace",
+  "category": "filesystem",
+  "permissions": ["filesystem.read"],
+  "risk_level": "low",
+  "requires_approval": false,
+  "enabled": true,
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "Path of the file to read relative to workspace (e.g. 'notes.txt', 'data/summary.json')"
+      },
+      "max_bytes": {
+        "type": "integer",
+        "description": "Optional maximum number of bytes to read (default 500000)"
+      }
+    },
+    "required": ["path"]
+  }
+}

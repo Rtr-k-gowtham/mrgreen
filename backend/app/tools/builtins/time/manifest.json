@@ -1,0 +1,19 @@
+{
+  "name": "time",
+  "version": "1.0.0",
+  "description": "Return current server and UTC date and time information",
+  "category": "system",
+  "permissions": [],
+  "risk_level": "low",
+  "requires_approval": false,
+  "enabled": true,
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "timezone": {
+        "type": "string",
+        "description": "Optional timezone name (e.g. 'UTC', 'local', 'America/New_York', 'Asia/Kolkata'). Defaults to 'UTC'."
+      }
+    }
+  }
+}

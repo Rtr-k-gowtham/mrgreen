@@ -38,10 +38,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("  AI Model: %s @ %s", settings.ollama_model, settings.ollama_base_url)
     logger.info("=" * 60)
 
-    # Initialize database tables
+    # Initialize database tables and sync registered tools
     try:
         await init_db()
         logger.info("Database initialized successfully")
+        from app.database.session import async_session_factory
+        from app.tools.registry import tool_registry
+        async with async_session_factory() as session:
+            await tool_registry.sync_to_db(session)
+        logger.info("Synchronized %d tools to database", tool_registry.count)
     except Exception as e:
         logger.error("Database initialization failed: %s", str(e))
         logger.warning("MR.GREEN starting without database — some features will be unavailable")
@@ -58,7 +63,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="MR.GREEN",
         description="Autonomous Personal AI Agent",
-        version="0.1.0",
+        version="0.2.0",
         lifespan=lifespan,
     )
 
@@ -84,6 +89,8 @@ def create_app() -> FastAPI:
     from app.api.routes.daily_logs import router as daily_logs_router
     from app.api.routes.tools import router as tools_router
     from app.api.routes.capabilities import router as capabilities_router
+    from app.api.routes.agent_runs import router as agent_runs_router
+    from app.api.routes.approvals import router as approvals_router
 
     app.include_router(health_router, tags=["Health"])
     app.include_router(chat_router, tags=["Chat"])
@@ -92,6 +99,8 @@ def create_app() -> FastAPI:
     app.include_router(daily_logs_router, tags=["Daily Logs"])
     app.include_router(tools_router, tags=["Tools"])
     app.include_router(capabilities_router, tags=["Capabilities"])
+    app.include_router(agent_runs_router, tags=["Agent Runs"])
+    app.include_router(approvals_router, tags=["Approvals"])
 
     return app
 

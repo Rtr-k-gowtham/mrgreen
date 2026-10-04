@@ -1,0 +1,29 @@
+{
+  "name": "file_write",
+  "version": "1.0.0",
+  "description": "Write or append text content to a file inside the approved MR.GREEN workspace",
+  "category": "filesystem",
+  "permissions": ["filesystem.write"],
+  "risk_level": "medium",
+  "requires_approval": false,
+  "enabled": true,
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "Relative file path inside workspace (e.g. 'output/report.txt')"
+      },
+      "content": {
+        "type": "string",
+        "description": "Text content to write to the file"
+      },
+      "mode": {
+        "type": "string",
+        "enum": ["write", "append"],
+        "description": "Write mode: 'write' (overwrite) or 'append'. Defaults to 'write'."
+      }
+    },
+    "required": ["path", "content"]
+  }
+}

@@ -5,6 +5,7 @@ Shared FastAPI dependencies for route injection.
 """
 
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,12 @@ def get_ai_provider() -> AIProvider:
 def get_tool_registry() -> ToolRegistry:
     """Get the global tool registry."""
     return tool_registry
+
+
+def get_tool_executor() -> Any:
+    """Get the global tool executor."""
+    from app.tools.executor import global_tool_executor
+    return global_tool_executor
 
 
 async def get_memory_manager(

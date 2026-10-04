@@ -1,0 +1,24 @@
+{
+  "name": "web_fetch",
+  "version": "1.0.0",
+  "description": "Fetch and extract text content from a public web page with SSRF protection",
+  "category": "network",
+  "permissions": ["network.read"],
+  "risk_level": "medium",
+  "requires_approval": false,
+  "enabled": true,
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Public HTTP or HTTPS URL to fetch (e.g. 'https://en.wikipedia.org/wiki/PostgreSQL')"
+      },
+      "max_bytes": {
+        "type": "integer",
+        "description": "Optional maximum content bytes to retrieve (default 200000)"
+      }
+    },
+    "required": ["url"]
+  }
+}

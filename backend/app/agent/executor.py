@@ -1,17 +1,19 @@
 """
-MR.GREEN — Executor
+MR.GREEN — Agent Executor
 
-Executes planned actions — either tool calls or AI generation.
+Executes planned actions — either tool calls via ToolExecutor or AI generation.
 Acts as the bridge between the planner's decisions and actual execution.
 """
 
 import logging
-import time
 from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.provider import AIMessage, AIProvider, AIResponse
 from app.tools.base import ToolResult
-from app.tools.registry import ToolRegistry
+from app.tools.executor import ToolExecutionResponse, ToolExecutor
+from app.tools.registry import ToolRegistry, tool_registry
 
 logger = logging.getLogger(__name__)
 
@@ -21,20 +23,20 @@ class Executor:
     Executes actions determined by the planner.
 
     Handles:
-    - Direct AI responses
-    - Tool execution with permission checks
-    - Timeout enforcement
+    - Direct AI generation
+    - Tool execution with full safety, permission, approval, and audit checks
     """
 
     def __init__(
         self,
         ai_provider: AIProvider,
-        tool_registry: ToolRegistry,
+        registry: ToolRegistry | None = None,
         tool_timeout: int = 60,
-    ):
+    ) -> None:
         self.ai_provider = ai_provider
-        self.tool_registry = tool_registry
+        self.tool_registry = registry or tool_registry
         self.tool_timeout = tool_timeout
+        self.tool_executor = ToolExecutor(registry=self.tool_registry, default_timeout=tool_timeout)
 
     async def generate_response(
         self,
@@ -52,49 +54,32 @@ class Executor:
     async def execute_tool(
         self,
         tool_name: str,
+        arguments: dict[str, Any] | None = None,
+        db_session: AsyncSession | None = None,
+        conversation_id: str | None = None,
+        agent_run_id: str | None = None,
+        agent_step_id: str | None = None,
         **kwargs: Any,
     ) -> ToolResult:
         """
-        Execute a tool by name with the given arguments.
-
-        Args:
-            tool_name: Name of the tool to execute.
-            **kwargs: Arguments to pass to the tool.
-
-        Returns:
-            ToolResult with execution outcome.
+        Execute a tool by name with the given arguments via ToolExecutor.
         """
-        tool = self.tool_registry.get(tool_name)
+        combined_args = dict(arguments or {})
+        combined_args.update(kwargs)
 
-        if tool is None:
-            return ToolResult(
-                success=False,
-                error=f"Tool not found: {tool_name}",
-            )
+        exec_resp: ToolExecutionResponse = await self.tool_executor.execute(
+            tool_name=tool_name,
+            arguments=combined_args,
+            db_session=db_session,
+            conversation_id=conversation_id,
+            agent_run_id=agent_run_id,
+            agent_step_id=agent_step_id,
+        )
 
-        # Check if approval is required
-        if tool.requires_approval:
-            return ToolResult(
-                success=False,
-                error=f"Tool '{tool_name}' requires approval before execution",
-            )
-
-        logger.info("Executing tool: %s", tool_name)
-        start = time.monotonic()
-
-        try:
-            result = await tool.execute(**kwargs)
-            result.duration_ms = int((time.monotonic() - start) * 1000)
-            logger.info(
-                "Tool completed: %s (success=%s, duration=%dms)",
-                tool_name, result.success, result.duration_ms,
-            )
-            return result
-        except Exception as e:
-            duration_ms = int((time.monotonic() - start) * 1000)
-            logger.error("Tool failed: %s — %s", tool_name, str(e))
-            return ToolResult(
-                success=False,
-                error=str(e),
-                duration_ms=duration_ms,
-            )
+        return ToolResult(
+            success=exec_resp.success,
+            output=exec_resp.result,
+            error=exec_resp.error,
+            duration_ms=exec_resp.duration_ms,
+            metadata=exec_resp.metadata,
+        )

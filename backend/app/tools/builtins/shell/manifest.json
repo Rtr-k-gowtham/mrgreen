@@ -1,0 +1,24 @@
+{
+  "name": "shell",
+  "version": "1.0.0",
+  "description": "Execute restricted shell commands within the sandbox environment (Disabled by default)",
+  "category": "shell",
+  "permissions": ["shell.execute"],
+  "risk_level": "critical",
+  "requires_approval": true,
+  "enabled": false,
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "description": "Shell command to execute inside sandbox"
+      },
+      "timeout_seconds": {
+        "type": "integer",
+        "description": "Execution timeout in seconds (default 30, max 60)"
+      }
+    },
+    "required": ["command"]
+  }
+}

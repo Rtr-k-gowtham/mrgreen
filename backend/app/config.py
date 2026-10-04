@@ -37,10 +37,12 @@ class Settings(BaseSettings):
     # Security
     secret_key: str = "change-me-to-a-random-secret-key"
 
-    # Agent limits
+    # Agent & Tool limits
     max_agent_iterations: int = 10
     agent_timeout_seconds: int = 300
     tool_timeout_seconds: int = 60
+    workspace_dir: str = "workspace"
+    max_tool_output_size: int = 500_000
 
     # Memory
     memory_extraction_enabled: bool = True
