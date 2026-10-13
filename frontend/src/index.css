@@ -4,15 +4,26 @@
 
 @layer base {
   :root {
-    --bg-dark: #080c0a;
-    --emerald-glow: #10b981;
+    --bg-main: #FFFFFF;
+    --green-primary: #16A34A;
+    --green-bright: #22C55E;
+    --green-dark: #166534;
+    --text-primary: #0F172A;
+    --text-secondary: #64748B;
   }
 
   html {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background-color: #080c0a;
-    color: #f3f4f6;
+    background-color: #FFFFFF;
+    color: #0F172A;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: #FFFFFF;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -22,11 +33,11 @@
 
 /* Safe area padding utilities for iOS / Mobile Devices */
 .pt-safe-top {
-  padding-top: max(0.75rem, env(safe-area-inset-top));
+  padding-top: max(1rem, env(safe-area-inset-top));
 }
 
 .pb-safe-bottom {
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
 }
 
 /* Custom Scrollbars */
@@ -40,42 +51,43 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1f2937;
+  background: #E2E8F0;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #10b981;
+  background: #22C55E;
 }
 
-/* Orb Keyframe Animations */
-@keyframes breathe {
+/* ── Jarvis Assistant Core Keyframe Animations ── */
+
+@keyframes jarvisBreathe {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 0 25px rgba(16, 185, 129, 0.25);
+    filter: drop-shadow(0 0 24px rgba(34, 197, 94, 0.18));
   }
   50% {
-    transform: scale(1.04);
-    box-shadow: 0 0 45px rgba(16, 185, 129, 0.45);
+    transform: scale(1.025);
+    filter: drop-shadow(0 0 36px rgba(34, 197, 94, 0.32));
   }
 }
 
-@keyframes pingSlow {
+@keyframes ringExpand {
   0% {
-    transform: scale(1);
-    opacity: 0.8;
+    transform: scale(0.96);
+    opacity: 0.3;
   }
   50% {
-    transform: scale(1.15);
-    opacity: 0.4;
+    transform: scale(1.08);
+    opacity: 0.8;
   }
   100% {
-    transform: scale(1);
-    opacity: 0.8;
+    transform: scale(0.96);
+    opacity: 0.3;
   }
 }
 
-@keyframes spinSlow {
+@keyframes gyroSpin {
   from {
     transform: rotate(0deg);
   }
@@ -84,7 +96,7 @@
   }
 }
 
-@keyframes spinReverse {
+@keyframes gyroSpinReverse {
   from {
     transform: rotate(360deg);
   }
@@ -93,24 +105,30 @@
   }
 }
 
-@keyframes bounceSubtle {
-  0%, 100% {
-    transform: translateY(0);
+@keyframes wavePulse {
+  0% {
+    transform: scale(0.98);
+    opacity: 0.5;
   }
   50% {
-    transform: translateY(-4px);
+    transform: scale(1.06);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(0.98);
+    opacity: 0.5;
   }
 }
 
 /* Simulated Audio Waveform Bar Animations */
 @keyframes audioBar1 {
   0%, 100% { height: 6px; }
-  50% { height: 18px; }
+  50% { height: 26px; }
 }
 
 @keyframes audioBar2 {
-  0%, 100% { height: 14px; }
-  50% { height: 26px; }
+  0%, 100% { height: 16px; }
+  50% { height: 32px; }
 }
 
 @keyframes audioBar3 {
@@ -118,45 +136,54 @@
   50% { height: 22px; }
 }
 
+@keyframes audioBar4 {
+  0%, 100% { height: 12px; }
+  50% { height: 28px; }
+}
+
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-breathe {
-  animation: breathe 4s ease-in-out infinite;
+.animate-jarvis-breathe {
+  animation: jarvisBreathe 4s ease-in-out infinite;
 }
 
-.animate-ping-slow {
-  animation: pingSlow 2s ease-in-out infinite;
+.animate-ring-expand {
+  animation: ringExpand 2.2s ease-in-out infinite;
 }
 
-.animate-spin-slow {
-  animation: spinSlow 8s linear infinite;
+.animate-gyro-spin {
+  animation: gyroSpin 12s linear infinite;
 }
 
-.animate-spin-reverse {
-  animation: spinReverse 6s linear infinite;
+.animate-gyro-reverse {
+  animation: gyroSpinReverse 9s linear infinite;
 }
 
-.animate-bounce-subtle {
-  animation: bounceSubtle 1.8s ease-in-out infinite;
+.animate-wave-pulse {
+  animation: wavePulse 1.4s ease-in-out infinite;
 }
 
 .animate-audio-bar-1 {
-  animation: audioBar1 0.6s ease-in-out infinite alternate;
+  animation: audioBar1 0.55s ease-in-out infinite alternate;
 }
 
 .animate-audio-bar-2 {
-  animation: audioBar2 0.8s ease-in-out infinite alternate;
+  animation: audioBar2 0.75s ease-in-out infinite alternate;
 }
 
 .animate-audio-bar-3 {
-  animation: audioBar3 0.7s ease-in-out infinite alternate;
+  animation: audioBar3 0.65s ease-in-out infinite alternate;
+}
+
+.animate-audio-bar-4 {
+  animation: audioBar4 0.85s ease-in-out infinite alternate;
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.25s ease-out forwards;
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Accessibility: Respect prefers-reduced-motion */

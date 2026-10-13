@@ -188,36 +188,95 @@ class VoiceSession:
                     memory_manager=self.memory_manager,
                 )
 
-                # Process through agent loop
-                logger.info("[LLM_STARTED] session=%s conversation=%s", self.session_id, self.conversation_id)
-                result: AgentResponse = await agent.process_message(
-                    user_message=user_message,
-                    conversation_id=self.conversation_id,
-                )
+                logger.info("[MODEL_INFERENCE_STARTED] session=%s conversation=%s", self.session_id, self.conversation_id)
+                sentence_buffer = SentenceBuffer()
+                accumulated_text: list[str] = []
+                first_token_time: float | None = None
+                first_audio_time: float | None = None
+                tts_start = time.monotonic()
 
-                llm_elapsed = time.monotonic() - turn_start
-                logger.info(
-                    "[LLM_COMPLETED] session=%s response_len=%d elapsed=%.2fs iterations=%d",
-                    self.session_id, len(result.content), llm_elapsed, result.iterations,
-                )
+                # Stream response tokens directly from LLM
+                try:
+                    async for delta in agent.generate_response_stream(
+                        user_message=user_message,
+                        conversation_id=self.conversation_id,
+                    ):
+                        if self._is_interrupted:
+                            break
+                        if first_token_time is None:
+                            first_token_time = time.monotonic()
+                            logger.info(
+                                "[FIRST_TOKEN_RECEIVED] session=%s elapsed=%.2fs",
+                                self.session_id, first_token_time - turn_start,
+                            )
+                        accumulated_text.append(delta)
+                        await self.send_event(ServerEventType.RESPONSE_TEXT_DELTA, {"delta": delta})
+
+                        # Pipelined TTS: as soon as sentence boundary is reached, synthesize audio
+                        ready_sentences = sentence_buffer.add_delta(delta)
+                        for sent in ready_sentences:
+                            if self._is_interrupted:
+                                break
+                            if self.state != VoiceState.ASSISTANT_SPEAKING:
+                                await self.transition_state(VoiceState.ASSISTANT_SPEAKING)
+                            if first_audio_time is None:
+                                first_audio_time = time.monotonic()
+                                logger.info(
+                                    "[FIRST_TTS_CHUNK] session=%s elapsed=%.2fs",
+                                    self.session_id, first_audio_time - turn_start,
+                                )
+                            await self._stream_sentence_tts(sent)
+
+                    # Flush any remaining text in sentence buffer
+                    tail_sentences = sentence_buffer.flush()
+                    for sent in tail_sentences:
+                        if self._is_interrupted:
+                            break
+                        if self.state != VoiceState.ASSISTANT_SPEAKING:
+                            await self.transition_state(VoiceState.ASSISTANT_SPEAKING)
+                        if first_audio_time is None:
+                            first_audio_time = time.monotonic()
+                            logger.info(
+                                "[FIRST_TTS_CHUNK] session=%s elapsed=%.2fs",
+                                self.session_id, first_audio_time - turn_start,
+                            )
+                        await self._stream_sentence_tts(sent)
+
+                except Exception as stream_err:
+                    logger.warning("Streaming turn encountered error (%s), using batch fallback", stream_err)
+
+                full_response = "".join(accumulated_text).strip()
+                if not full_response:
+                    # Fallback to standard process_message if stream produced no text
+                    logger.info("[STREAM_FALLBACK] Executing batch process_message")
+                    result: AgentResponse = await agent.process_message(
+                        user_message=user_message,
+                        conversation_id=self.conversation_id,
+                    )
+                    full_response = result.content
+                    await self._stream_tts(full_response)
+
+                total_tts_time = time.monotonic() - tts_start
+                logger.info("[TTS_STREAM_COMPLETED] session=%s tts_duration=%.2fs", self.session_id, total_tts_time)
 
                 if self._is_interrupted:
                     logger.info("[VOICE_INTERRUPTED] Agent turn cancelled after processing.")
                     return
 
-                response_text = result.content
                 await self.send_event(
                     ServerEventType.RESPONSE_TEXT_DONE,
                     {
-                        "response": response_text,
+                        "response": full_response,
                         "conversation_id": self.conversation_id,
-                        "agent_run_id": result.agent_run_id,
-                        "iterations": result.iterations,
                     },
                 )
 
-                # Stream audio synthesis through CosyVoice
-                await self._stream_tts(response_text)
+                # Record messages into memory & history
+                self.memory_manager.short_term.add("user", user_message)
+                self.memory_manager.short_term.add("assistant", full_response)
+
+                turn_total = time.monotonic() - turn_start
+                logger.info("[TURN_COMPLETED] session=%s total_time=%.2fs", self.session_id, turn_total)
 
                 if not self._is_interrupted:
                     await self.transition_state(VoiceState.LISTENING)
@@ -230,6 +289,29 @@ class VoiceSession:
             await self.transition_state(VoiceState.ERROR)
             await asyncio.sleep(1.0)
             await self.transition_state(VoiceState.LISTENING)
+
+    async def _stream_sentence_tts(self, sentence: str) -> None:
+        """Stream audio chunks for a single sentence."""
+        if self._is_interrupted or not sentence.strip():
+            return
+        await self.send_event(ServerEventType.AUDIO_START, {"text": sentence})
+        try:
+            async for chunk in self.voice_engine.synthesize_stream(
+                text=sentence,
+                voice_profile_id=self.active_voice_profile,
+                language=None if self.active_language == "auto" else self.active_language,
+            ):
+                if self._is_interrupted:
+                    break
+                b64_chunk = base64.b64encode(chunk).decode("ascii")
+                await self.send_event(
+                    ServerEventType.AUDIO_CHUNK,
+                    {"audio_data": b64_chunk, "format": "wav", "sample_rate": 22050},
+                )
+            await self.send_event(ServerEventType.AUDIO_END)
+        except Exception as e:
+            logger.error("TTS stream error for sentence '%s': %s", sentence[:30], str(e))
+            await self.send_event(ServerEventType.ERROR, {"error": "TTS audio streaming error."})
 
     async def _stream_tts(self, text: str) -> None:
         """
@@ -252,30 +334,8 @@ class VoiceSession:
         for sentence in sentences:
             if self._is_interrupted:
                 break
-
             await self.send_event(ServerEventType.RESPONSE_TEXT_DELTA, {"delta": sentence})
-            await self.send_event(ServerEventType.AUDIO_START, {"text": sentence})
-
-            try:
-                async for chunk in self.voice_engine.synthesize_stream(
-                    text=sentence,
-                    voice_profile_id=self.active_voice_profile,
-                    language=None if self.active_language == "auto" else self.active_language,
-                ):
-                    if self._is_interrupted:
-                        break
-                    # Send audio chunk as base64 in structured event
-                    b64_chunk = base64.b64encode(chunk).decode("ascii")
-                    await self.send_event(
-                        ServerEventType.AUDIO_CHUNK,
-                        {"audio_data": b64_chunk, "format": "wav", "sample_rate": 22050},
-                    )
-
-                await self.send_event(ServerEventType.AUDIO_END)
-
-            except Exception as e:
-                logger.error("TTS stream error for sentence '%s': %s", sentence[:30], str(e))
-                await self.send_event(ServerEventType.ERROR, {"error": "TTS audio streaming error."})
+            await self._stream_sentence_tts(sentence)
 
         logger.info("[TTS_COMPLETED] session=%s elapsed=%.2fs", self.session_id, time.monotonic() - tts_start)
 

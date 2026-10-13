@@ -8,11 +8,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: "#080c0a",
+        background: "#FFFFFF",
         surface: {
-          DEFAULT: "#0f1713",
-          light: "#16231d",
-          border: "#1e332a",
+          DEFAULT: "#F8FAFC",
+          light: "#FFFFFF",
+          border: "#E2E8F0",
         },
         green: {
           50: "#f0fdf4",
@@ -27,11 +27,18 @@ export default {
           900: "#14532d",
           950: "#052e16",
         },
-        emerald: {
-          400: "#34d399",
-          500: "#10b981",
-          600: "#059669",
-        }
+        slate: {
+          50: "#f8fafc",
+          100: "#f1f5f9",
+          200: "#e2e8f0",
+          300: "#cbd5e1",
+          400: "#94a3b8",
+          500: "#64748b",
+          600: "#475569",
+          700: "#334155",
+          800: "#1e293b",
+          900: "#0f172a",
+        },
       },
       fontFamily: {
         sans: [
@@ -47,25 +54,8 @@ export default {
       },
       animation: {
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "spin-slow": "spin 8s linear infinite",
-        "orb-idle": "orb-breathe 4s ease-in-out infinite",
-        "orb-listening": "orb-pulse 1.5s ease-in-out infinite",
-        "orb-speaking": "orb-wave 1.2s ease-in-out infinite",
+        "spin-slow": "spin 12s linear infinite",
       },
-      keyframes: {
-        "orb-breathe": {
-          "0%, 100%": { transform: "scale(1)", opacity: "0.85" },
-          "50%": { transform: "scale(1.05)", opacity: "1" },
-        },
-        "orb-pulse": {
-          "0%, 100%": { transform: "scale(0.98)", boxShadow: "0 0 20px 2px rgba(16, 185, 129, 0.4)" },
-          "50%": { transform: "scale(1.1)", boxShadow: "0 0 35px 8px rgba(16, 185, 129, 0.75)" },
-        },
-        "orb-wave": {
-          "0%, 100%": { transform: "scale(1)", filter: "hue-rotate(0deg)" },
-          "50%": { transform: "scale(1.08)", filter: "hue-rotate(25deg)" },
-        }
-      }
     },
   },
   plugins: [],

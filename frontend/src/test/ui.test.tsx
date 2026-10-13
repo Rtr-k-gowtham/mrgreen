@@ -1,10 +1,132 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GreenOrb } from '../components/voice/GreenOrb';
+import { MrGreenAssistantVisual } from '../components/voice/MrGreenAssistantVisual';
+import { BottomVoiceControl } from '../components/voice/BottomVoiceControl';
 import { Header } from '../components/layout/Header';
 import { ChatInput } from '../components/chat/ChatInput';
 import { ChatMessage } from '../components/chat/ChatMessage';
 import { HistoryDrawer } from '../components/layout/HistoryDrawer';
+
+describe('UI — MrGreenAssistantVisual Component', () => {
+  it('renders in IDLE state with "Ready when you are" status', () => {
+    render(<MrGreenAssistantVisual voiceState="IDLE" />);
+    expect(screen.getByText('Ready when you are')).toBeInTheDocument();
+  });
+
+  it('renders in LISTENING state with transcript caption', () => {
+    render(
+      <MrGreenAssistantVisual
+        voiceState="LISTENING"
+        isListening={true}
+        interimTranscript="Hello Green"
+      />
+    );
+    expect(screen.getByText('Listening...')).toBeInTheDocument();
+    expect(screen.getByText('"Hello Green"')).toBeInTheDocument();
+  });
+
+  it('renders in THINKING state', () => {
+    render(<MrGreenAssistantVisual voiceState="THINKING" isProcessing={true} />);
+    expect(screen.getByText('Thinking...')).toBeInTheDocument();
+  });
+
+  it('renders in SPEAKING state with response caption', () => {
+    render(
+      <MrGreenAssistantVisual
+        voiceState="ASSISTANT_SPEAKING"
+        isSpeaking={true}
+        lastResponse="I am online and ready."
+      />
+    );
+    expect(screen.getByText('Speaking...')).toBeInTheDocument();
+    expect(screen.getByText('I am online and ready.')).toBeInTheDocument();
+  });
+
+  it('renders in ERROR state with retry button', () => {
+    const onRetry = vi.fn();
+    render(
+      <MrGreenAssistantVisual
+        voiceState="ERROR"
+        isOnline={false}
+        onRetry={onRetry}
+      />
+    );
+    expect(screen.getByText('Connection issue')).toBeInTheDocument();
+    const retryBtn = screen.getByRole('button', { name: /retry connection/i });
+    expect(retryBtn).toBeInTheDocument();
+    fireEvent.click(retryBtn);
+    expect(onRetry).toHaveBeenCalled();
+  });
+});
+
+describe('UI — BottomVoiceControl Component', () => {
+  it('renders circular mic button and toggles voice on click', () => {
+    const onToggle = vi.fn();
+    render(
+      <BottomVoiceControl
+        isListening={false}
+        isSpeaking={false}
+        isProcessing={false}
+        speechSupported={true}
+        onToggleListen={onToggle}
+        onStopSpeaking={() => {}}
+        onSendMessage={() => {}}
+      />
+    );
+
+    const micBtn = screen.getByRole('button', { name: /start listening/i });
+    expect(micBtn).toBeInTheDocument();
+    fireEvent.click(micBtn);
+    expect(onToggle).toHaveBeenCalled();
+  });
+
+  it('renders stop button when speaking and calls onStopSpeaking', () => {
+    const onStop = vi.fn();
+    render(
+      <BottomVoiceControl
+        isListening={false}
+        isSpeaking={true}
+        isProcessing={false}
+        speechSupported={true}
+        onToggleListen={() => {}}
+        onStopSpeaking={onStop}
+        onSendMessage={() => {}}
+      />
+    );
+
+    const stopBtn = screen.getByRole('button', { name: /stop speaking/i });
+    expect(stopBtn).toBeInTheDocument();
+    fireEvent.click(stopBtn);
+    expect(onStop).toHaveBeenCalled();
+  });
+
+  it('reveals text fallback input and sends message', () => {
+    const onSend = vi.fn();
+    render(
+      <BottomVoiceControl
+        isListening={false}
+        isSpeaking={false}
+        isProcessing={false}
+        speechSupported={true}
+        onToggleListen={() => {}}
+        onStopSpeaking={() => {}}
+        onSendMessage={onSend}
+      />
+    );
+
+    const toggleBtn = screen.getByRole('button', { name: /toggle text entry fallback/i });
+    fireEvent.click(toggleBtn);
+
+    const input = screen.getByPlaceholderText(/type a message to mr.green/i);
+    expect(input).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'Testing message' } });
+
+    const sendBtn = screen.getByRole('button', { name: /send message/i });
+    fireEvent.click(sendBtn);
+    expect(onSend).toHaveBeenCalledWith('Testing message');
+  });
+});
 
 describe('UI — GreenOrb Component', () => {
   it('renders GreenOrb in IDLE state with accessible button', () => {

@@ -428,6 +428,64 @@ class Agent:
 
         return response.content
 
+    async def generate_response_stream(
+        self,
+        user_message: str,
+        conversation_id: str,
+    ):
+        """
+        Stream response token deltas directly from the model.
+        Used by the voice engine to pipeline sentence construction and speech synthesis.
+        """
+        # Fast planning check
+        plan = await self.planner.plan(
+            user_message=user_message,
+            available_tools=self.tool_registry.list_names(),
+        )
+
+        if plan.has_tool_calls:
+            # For tool calls, execute tool and yield final result
+            for action in plan.actions:
+                if action.action_type == ActionType.TOOL_CALL and action.tool_name:
+                    tool_res = await self.executor.execute_tool(
+                        tool_name=action.tool_name,
+                        arguments=action.tool_args or {},
+                        db_session=self.db,
+                        conversation_id=conversation_id,
+                    )
+                    if not tool_res.success:
+                        yield f"Tool '{action.tool_name}' error: {tool_res.error}"
+                        return
+                    res_text = await self._generate_response_with_tool_result(
+                        user_message=user_message,
+                        conversation_id=conversation_id,
+                        tool_name=action.tool_name,
+                        tool_input=action.tool_args or {},
+                        tool_output=tool_res.output,
+                    )
+                    yield res_text
+                    return
+
+        # Direct AI generation stream
+        memory_context = await self.memory.get_context_for_ai()
+        system_prompt = SYSTEM_PROMPT.format(
+            memory_context=memory_context or "No stored memories yet.",
+            current_date=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        )
+        conversation_messages = await self.memory.get_conversation_messages()
+        ai_messages = [
+            AIMessage(role=msg["role"], content=msg["content"])
+            for msg in conversation_messages
+        ]
+        if not ai_messages or ai_messages[-1].content != user_message:
+            ai_messages.append(AIMessage(role="user", content=user_message))
+
+        async for delta in self.executor.generate_response_stream(
+            messages=ai_messages,
+            system_prompt=system_prompt,
+        ):
+            yield delta
+
     async def _get_or_create_conversation(self, conversation_id: str) -> Conversation:
         """Get an existing conversation or create a new one."""
         from sqlalchemy import select

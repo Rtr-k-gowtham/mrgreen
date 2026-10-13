@@ -142,3 +142,38 @@ async def test_voice_session_initialize() -> None:
     assert ready_event["conversation_id"] == "conv_123"
     assert ready_event["tts_available"] is True
 
+
+@pytest.mark.asyncio
+async def test_voice_session_stream_sentence_tts() -> None:
+    """Verify _stream_sentence_tts emits audio.start, audio.chunk, and audio.end."""
+    from unittest.mock import AsyncMock, MagicMock
+    from app.voice.session import VoiceSession
+
+    mock_ws = AsyncMock()
+    mock_ai = MagicMock()
+    mock_tools = MagicMock()
+    mock_mem = MagicMock()
+    mock_engine = MagicMock()
+
+    async def fake_chunks(*args, **kwargs):
+        yield b"RIFF" + b"\x00" * 40
+
+    mock_engine.synthesize_stream = fake_chunks
+
+    session = VoiceSession(
+        session_id="test_sess_02",
+        websocket=mock_ws,
+        ai_provider=mock_ai,
+        tool_registry=mock_tools,
+        memory_manager=mock_mem,
+        voice_engine=mock_engine,
+        conversation_id="conv_456",
+    )
+
+    await session._stream_sentence_tts("Hello there.")
+    event_types = [c[0][0]["type"] for c in mock_ws.send_json.call_args_list]
+    assert "audio.start" in event_types
+    assert "audio.chunk" in event_types
+    assert "audio.end" in event_types
+
+

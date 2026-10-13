@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
 import { useChat } from './hooks/useChat';
 import { Header } from './components/layout/Header';
-import { HistoryDrawer } from './components/layout/HistoryDrawer';
-import { ChatList } from './components/chat/ChatList';
-import { ChatInput } from './components/chat/ChatInput';
+import { MrGreenAssistantVisual } from './components/voice/MrGreenAssistantVisual';
+import { BottomVoiceControl } from './components/voice/BottomVoiceControl';
 import { VoiceSettingsModal } from './components/voice/VoiceSettingsModal';
 import { VoiceDiagnosticPanel } from './components/voice/VoiceDiagnosticPanel';
 
 export const App: React.FC = () => {
   const {
     messages,
-    conversationId,
     isOnline,
     isProcessing,
     voiceState,
@@ -24,19 +22,22 @@ export const App: React.FC = () => {
     interrupt,
     sendMessage,
     startNewChat,
-    loadConversation,
     diagnosticEvents,
   } = useChat();
 
-  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+
+  // Extract latest assistant reply for subtle visual caption
+  const lastAssistantMessage = messages
+    .filter((m) => m.role === 'assistant')
+    .slice(-1)[0]?.content;
 
   // Toggle voice input with immediate interruption of assistant speech
   const handleToggleListening = () => {
-    if (stt.isListening) {
+    if (stt.isListening || voiceState === 'LISTENING' || voiceState === 'USER_SPEAKING') {
       stt.stopListening();
     } else {
-      // If assistant is currently speaking, barge in / interrupt immediately
+      // If assistant is currently speaking, barge-in / interrupt immediately
       if (tts.isSpeaking || voiceState === 'ASSISTANT_SPEAKING') {
         interrupt();
       }
@@ -44,77 +45,60 @@ export const App: React.FC = () => {
     }
   };
 
+  const isActuallySpeaking = tts.isSpeaking || voiceState === 'ASSISTANT_SPEAKING' || voiceState === 'SPEAKING';
+  const isActuallyListening = stt.isListening || voiceState === 'LISTENING' || voiceState === 'USER_SPEAKING';
+  const isActuallyThinking = isProcessing || voiceState === 'THINKING' || voiceState === 'PROCESSING';
+
   return (
-    <div className="flex flex-col h-screen max-h-screen bg-[#050806] text-zinc-100 overflow-hidden font-sans select-none">
-      {/* Top Header — Cybernetic Minimal HUD */}
+    <div className="flex flex-col h-screen max-h-screen bg-white text-slate-900 overflow-hidden font-sans select-none">
+      {/* Header — Minimal Green MG Logo + Leaf & Settings */}
       <Header
         isOnline={isOnline}
         onNewChat={startNewChat}
-        onOpenHistory={() => setIsHistoryOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
-      {/* Main Container — The Conversation is the Hero (NO ORB) */}
-      <main className="flex-1 flex flex-col min-h-0 max-w-4xl w-full mx-auto relative overflow-hidden">
-        {/* Global Error Banner (if any) */}
+      {/* Main Full-Screen Jarvis Experience */}
+      <main className="flex-1 flex flex-col justify-between items-center max-w-2xl w-full mx-auto relative px-4 overflow-hidden">
+        {/* Subtle Non-intrusive Error Toast (if any) */}
         {errorMessage && (
-          <div className="px-4 py-1.5 flex-shrink-0 animate-fade-in">
-            <div className="bg-rose-950/80 border border-rose-800 text-rose-200 text-xs px-3 py-1.5 rounded-xl flex items-center justify-between font-mono">
+          <div className="w-full max-w-sm mt-3 animate-fade-in z-20">
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs px-3.5 py-2 rounded-2xl flex items-center justify-between shadow-sm">
               <span>{errorMessage}</span>
             </div>
           </div>
         )}
 
-        {/* Conversation Message List — Occupies Full Viewport */}
-        <section
-          aria-label="Conversation messages"
-          className="flex-1 min-h-0 flex flex-col overflow-hidden relative"
-        >
-          <ChatList
-            messages={messages}
-            isProcessing={isProcessing || voiceState === 'THINKING'}
-            onSelectPrompt={sendMessage}
-            onSpeak={(text) => tts.speak(text)}
-          />
-        </section>
-
-        {/* Bottom Composer with Voice Controls & Real-Time Barge-in */}
-        <footer className="flex-shrink-0">
-          <ChatInput
-            onSendMessage={sendMessage}
-            isListening={stt.isListening || voiceState === 'LISTENING' || voiceState === 'USER_SPEAKING'}
-            isSpeaking={tts.isSpeaking || voiceState === 'ASSISTANT_SPEAKING'}
-            isProcessing={isProcessing || voiceState === 'THINKING'}
-            interimTranscript={stt.interimTranscript}
+        {/* Center: Beautiful Futuristic MR.GREEN Assistant Visual & Status */}
+        <div className="flex-1 flex items-center justify-center w-full">
+          <MrGreenAssistantVisual
             voiceState={voiceState}
+            isListening={isActuallyListening}
+            isSpeaking={isActuallySpeaking}
+            isProcessing={isActuallyThinking}
+            isOnline={isOnline}
+            interimTranscript={stt.interimTranscript}
+            lastResponse={lastAssistantMessage}
+            onRetry={startNewChat}
+          />
+        </div>
+
+        {/* Bottom: Circular Microphone Control with Waveforms & Discreet Text Fallback */}
+        <footer className="w-full flex-shrink-0">
+          <BottomVoiceControl
+            isListening={isActuallyListening}
+            isSpeaking={isActuallySpeaking}
+            isProcessing={isActuallyThinking}
             speechSupported={stt.isSupported}
             onToggleListen={handleToggleListening}
             onStopSpeaking={interrupt}
-            voiceEnabled={tts.voiceEnabled}
-            onToggleVoice={() => tts.setVoiceEnabled(!tts.voiceEnabled)}
-            activeLanguage={activeLanguage}
-            onChangeLanguage={setActiveLanguage}
+            onSendMessage={sendMessage}
             disabled={!isOnline}
           />
         </footer>
       </main>
 
-      {/* Slide-out History Drawer */}
-      <HistoryDrawer
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        activeConversationId={conversationId}
-        onSelectConversation={(id) => {
-          loadConversation(id);
-          setIsHistoryOpen(false);
-        }}
-        onNewChat={() => {
-          startNewChat();
-          setIsHistoryOpen(false);
-        }}
-      />
-
-      {/* Voice & CosyVoice Settings Modal */}
+      {/* Settings Modal */}
       <VoiceSettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}

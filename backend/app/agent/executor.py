@@ -51,6 +51,20 @@ class Executor:
             temperature=temperature,
         )
 
+    async def generate_response_stream(
+        self,
+        messages: list[AIMessage],
+        system_prompt: str,
+        temperature: float = 0.7,
+    ):
+        """Stream direct AI response token deltas."""
+        async for delta in self.ai_provider.generate_stream(
+            messages=messages,
+            system_prompt=system_prompt,
+            temperature=temperature,
+        ):
+            yield delta
+
     async def execute_tool(
         self,
         tool_name: str,

@@ -14,7 +14,7 @@ Architecture:
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, AsyncIterator
 
 
 @dataclass
@@ -52,6 +52,7 @@ class AIProvider(ABC):
 
     Every AI provider must implement:
     - generate(): Send messages and get a text response
+    - generate_stream(): Stream delta tokens in real-time
     - embed(): Generate vector embeddings for text
     - health_check(): Verify the provider is available
     """
@@ -79,6 +80,28 @@ class AIProvider(ABC):
             AIResponse with the generated text and metadata.
         """
         ...
+
+    async def generate_stream(
+        self,
+        messages: list[AIMessage],
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """
+        Stream text token deltas from the AI model in real-time.
+        Default implementation falls back to batch generate().
+        """
+        resp = await self.generate(
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            system_prompt=system_prompt,
+            **kwargs,
+        )
+        if resp.content:
+            yield resp.content
 
     @abstractmethod
     async def embed(self, text: str) -> EmbeddingResponse:

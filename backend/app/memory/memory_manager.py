@@ -82,6 +82,23 @@ class MemoryManager:
         self.extraction_enabled = extraction_enabled
         self._db = db_session
 
+    @staticmethod
+    def _should_extract(content: str) -> bool:
+        """
+        Fast heuristic screening for memory extraction.
+        Avoids redundant 2-5s LLM calls on greetings, questions, or ephemeral commands.
+        """
+        import re
+        text = content.strip().lower()
+        if len(text) < 5:
+            return False
+        patterns = (
+            r"\b(my name is|call me|i am|i'm|i work|i live|i prefer|i like|i dislike|i love|i hate)\b",
+            r"\b(remember (that|this)?|don't forget|keep in mind|my favorite|my preference)\b",
+            r"\b(always|never|from now on|please note that|my email|my phone)\b",
+        )
+        return any(re.search(p, text) for p in patterns)
+
     async def add_user_message(
         self,
         content: str,
@@ -97,9 +114,9 @@ class MemoryManager:
         # Add to short-term memory
         self.short_term.add("user", content, message_id)
 
-        # Extract memories if enabled
+        # Extract memories if enabled and heuristic detects extractable indicators
         extracted: list[dict[str, Any]] = []
-        if self.extraction_enabled:
+        if self.extraction_enabled and self._should_extract(content):
             extracted = await self._extract_memories(content, message_id, session_id)
 
         return extracted
@@ -119,7 +136,12 @@ class MemoryManager:
         Combines long-term memories into a context string that gets
         injected into the system prompt.
         """
-        return await self.long_term.retrieve_for_context()
+        import time
+        t0 = time.monotonic()
+        context = await self.long_term.retrieve_for_context()
+        elapsed = time.monotonic() - t0
+        logger.info("[MEMORY_RETRIEVAL] context_len=%d elapsed=%.2fs", len(context or ""), elapsed)
+        return context
 
     async def get_conversation_messages(self) -> list[dict[str, str]]:
         """Get recent conversation messages for AI context."""
