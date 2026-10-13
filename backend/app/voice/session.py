@@ -63,6 +63,7 @@ class VoiceSession:
 
         # Concurrency & interruption controls
         self._current_turn_task: asyncio.Task[Any] | None = None
+        self._current_tts_task: asyncio.Task[Any] | None = None
         self._is_interrupted: bool = False
         self._is_closed: bool = False
 
@@ -121,6 +122,8 @@ class VoiceSession:
         logger.info("⚡ Barge-in interrupt triggered on session %s", self.session_id)
         self._is_interrupted = True
 
+        if self._current_tts_task and not self._current_tts_task.done():
+            self._current_tts_task.cancel()
         if self._current_turn_task and not self._current_turn_task.done():
             self._current_turn_task.cancel()
             try:
@@ -195,7 +198,37 @@ class VoiceSession:
                 first_audio_time: float | None = None
                 tts_start = time.monotonic()
 
-                # Stream response tokens directly from LLM
+                # Pipelined TTS sentence queue & background consumer
+                sentence_queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+                async def _tts_consumer() -> None:
+                    nonlocal first_audio_time
+                    while True:
+                        sent = await sentence_queue.get()
+                        if sent is None:
+                            sentence_queue.task_done()
+                            break
+                        if self._is_interrupted:
+                            sentence_queue.task_done()
+                            break
+                        try:
+                            if self.state != VoiceState.ASSISTANT_SPEAKING:
+                                await self.transition_state(VoiceState.ASSISTANT_SPEAKING)
+                            if first_audio_time is None:
+                                first_audio_time = time.monotonic()
+                                logger.info(
+                                    "[FIRST_TTS_CHUNK] session=%s elapsed=%.2fs",
+                                    self.session_id, first_audio_time - turn_start,
+                                )
+                            await self._stream_sentence_tts(sent)
+                        except Exception as tts_err:
+                            logger.error("TTS worker sentence error: %s", tts_err)
+                        finally:
+                            sentence_queue.task_done()
+
+                self._current_tts_task = asyncio.create_task(_tts_consumer())
+
+                # Stream response tokens directly from LLM without blocking on TTS
                 try:
                     async for delta in agent.generate_response_stream(
                         user_message=user_message,
@@ -212,38 +245,27 @@ class VoiceSession:
                         accumulated_text.append(delta)
                         await self.send_event(ServerEventType.RESPONSE_TEXT_DELTA, {"delta": delta})
 
-                        # Pipelined TTS: as soon as sentence boundary is reached, synthesize audio
+                        # As soon as sentence boundary is reached, queue for concurrent TTS synthesis
                         ready_sentences = sentence_buffer.add_delta(delta)
                         for sent in ready_sentences:
-                            if self._is_interrupted:
-                                break
-                            if self.state != VoiceState.ASSISTANT_SPEAKING:
-                                await self.transition_state(VoiceState.ASSISTANT_SPEAKING)
-                            if first_audio_time is None:
-                                first_audio_time = time.monotonic()
-                                logger.info(
-                                    "[FIRST_TTS_CHUNK] session=%s elapsed=%.2fs",
-                                    self.session_id, first_audio_time - turn_start,
-                                )
-                            await self._stream_sentence_tts(sent)
+                            if not self._is_interrupted:
+                                await sentence_queue.put(sent)
 
                     # Flush any remaining text in sentence buffer
                     tail_sentences = sentence_buffer.flush()
                     for sent in tail_sentences:
-                        if self._is_interrupted:
-                            break
-                        if self.state != VoiceState.ASSISTANT_SPEAKING:
-                            await self.transition_state(VoiceState.ASSISTANT_SPEAKING)
-                        if first_audio_time is None:
-                            first_audio_time = time.monotonic()
-                            logger.info(
-                                "[FIRST_TTS_CHUNK] session=%s elapsed=%.2fs",
-                                self.session_id, first_audio_time - turn_start,
-                            )
-                        await self._stream_sentence_tts(sent)
+                        if not self._is_interrupted:
+                            await sentence_queue.put(sent)
+
+                    # Signal TTS consumer to complete and await audio completion
+                    await sentence_queue.put(None)
+                    if self._current_tts_task:
+                        await self._current_tts_task
 
                 except Exception as stream_err:
                     logger.warning("Streaming turn encountered error (%s), using batch fallback", stream_err)
+                    if self._current_tts_task and not self._current_tts_task.done():
+                        self._current_tts_task.cancel()
 
                 full_response = "".join(accumulated_text).strip()
                 if not full_response:
@@ -342,6 +364,8 @@ class VoiceSession:
     async def close(self) -> None:
         """Gracefully terminate session."""
         self._is_closed = True
+        if self._current_tts_task and not self._current_tts_task.done():
+            self._current_tts_task.cancel()
         if self._current_turn_task and not self._current_turn_task.done():
             self._current_turn_task.cancel()
         self.state = VoiceState.DISCONNECTED

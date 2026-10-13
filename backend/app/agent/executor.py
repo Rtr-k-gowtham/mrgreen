@@ -56,12 +56,14 @@ class Executor:
         messages: list[AIMessage],
         system_prompt: str,
         temperature: float = 0.7,
+        max_tokens: int | None = None,
     ):
         """Stream direct AI response token deltas."""
         async for delta in self.ai_provider.generate_stream(
             messages=messages,
             system_prompt=system_prompt,
             temperature=temperature,
+            max_tokens=max_tokens,
         ):
             yield delta
 

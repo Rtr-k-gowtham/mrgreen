@@ -184,7 +184,7 @@ export function useSpeechRecognition({
           latestTranscriptRef.current = currentPhrase;
           setInterimTranscript(currentPhrase);
 
-          // Reset silence debounce timer: 1.5 seconds of silence automatically commits and sends
+          // Reset silence debounce timer: 850ms of silence automatically commits and sends
           if (silenceTimerRef.current) {
             clearTimeout(silenceTimerRef.current);
           }
@@ -198,7 +198,7 @@ export function useSpeechRecognition({
               }
               setIsListening(false);
             }
-          }, 1500);
+          }, 850);
         }
       };
 

@@ -23,6 +23,7 @@ export const App: React.FC = () => {
     sendMessage,
     startNewChat,
     diagnosticEvents,
+    streamingResponse,
   } = useChat();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -79,6 +80,7 @@ export const App: React.FC = () => {
             isOnline={isOnline}
             interimTranscript={stt.interimTranscript}
             lastResponse={lastAssistantMessage}
+            streamingResponse={streamingResponse}
             onRetry={startNewChat}
           />
         </div>

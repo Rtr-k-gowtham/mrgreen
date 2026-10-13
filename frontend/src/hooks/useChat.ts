@@ -23,6 +23,7 @@ export function useChat() {
   const [activeVoiceProfile, setActiveVoiceProfile] =
     useState<VoiceProfileId>('GREEN_DEFAULT');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [streamingResponse, setStreamingResponse] = useState<string>('');
   const [diagnosticEvents, setDiagnosticEvents] = useState<VoiceDiagnosticEvent[]>([]);
 
   // ── Refs for stable access inside callbacks ─────────────────────
@@ -68,6 +69,7 @@ export function useChat() {
     }
 
     setVoiceState('INTERRUPTED');
+    setStreamingResponse('');
     setTimeout(() => setVoiceState('IDLE'), 100);
   }, []);
 
@@ -109,11 +111,12 @@ export function useChat() {
         // was already added to chat when we submitted it locally.
       },
 
-      onResponseDelta: (_delta) => {
-        // Live streaming text updates (future progressive display)
+      onResponseDelta: (delta) => {
+        setStreamingResponse((prev) => prev + delta);
       },
 
       onResponseDone: (data) => {
+        setStreamingResponse('');
         // ── Assistant response received via WebSocket ──
         if (data.conversation_id) {
           setConversationId(data.conversation_id);
@@ -183,6 +186,7 @@ export function useChat() {
       },
 
       onInterrupted: () => {
+        setStreamingResponse('');
         if (ttsFallbackTimerRef.current) {
           clearTimeout(ttsFallbackTimerRef.current);
           ttsFallbackTimerRef.current = null;
@@ -254,6 +258,7 @@ export function useChat() {
         status: 'sent',
       };
       setMessages((prev) => [...prev, userMessage]);
+      setStreamingResponse('');
       setIsProcessing(true);
       setErrorMessage(null);
       wsProcessingRef.current = true;
@@ -374,6 +379,7 @@ export function useChat() {
       };
 
       setMessages((prev) => [...prev, userMessage]);
+      setStreamingResponse('');
       setIsProcessing(true);
       setVoiceState('THINKING');
 
@@ -467,6 +473,7 @@ export function useChat() {
     setMessages([]);
     setConversationId(null);
     setErrorMessage(null);
+    setStreamingResponse('');
     setActiveTool(null);
     setVoiceState('IDLE');
     wsProcessingRef.current = false;
@@ -527,5 +534,6 @@ export function useChat() {
     loadConversation,
     checkConnection,
     diagnosticEvents,
+    streamingResponse,
   };
 }

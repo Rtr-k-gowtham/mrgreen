@@ -10,6 +10,7 @@ interface MrGreenAssistantVisualProps {
   isOnline?: boolean;
   interimTranscript?: string;
   lastResponse?: string;
+  streamingResponse?: string;
   onRetry?: () => void;
 }
 
@@ -21,6 +22,7 @@ export const MrGreenAssistantVisual: React.FC<MrGreenAssistantVisualProps> = ({
   isOnline = true,
   interimTranscript,
   lastResponse,
+  streamingResponse,
   onRetry,
 }) => {
   // Determine dominant mode for visual state
@@ -40,10 +42,10 @@ export const MrGreenAssistantVisual: React.FC<MrGreenAssistantVisualProps> = ({
 
   const statusText = getStatusText();
 
-  // Secondary caption: interim transcript while listening, or subtle response snippet
+  // Secondary caption: interim transcript while listening, live streaming text, or subtle response snippet
   const captionText = isActualListening
     ? (interimTranscript ? `"${interimTranscript}"` : '')
-    : (isActualSpeaking && lastResponse ? lastResponse : '');
+    : (streamingResponse ? streamingResponse : ((isActualSpeaking || isActualThinking) && lastResponse ? lastResponse : ''));
 
   return (
     <div className="flex flex-col items-center justify-center select-none w-full max-w-md mx-auto px-4 py-8">

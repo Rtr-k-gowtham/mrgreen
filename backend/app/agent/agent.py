@@ -58,6 +58,13 @@ Your name is MR.GREEN (or Green). When introducing yourself, use this name.
 Current date: {current_date}
 """
 
+VOICE_SYSTEM_PROMPT_ADDENDUM = """
+Guidelines for spoken voice conversation:
+- Keep your answers concise, direct, and natural (1 to 2 short spoken sentences).
+- Do NOT use markdown formatting, bold text, asterisks, bullet points, numbered lists, or emojis.
+- Speak naturally like a knowledgeable conversational companion.
+"""
+
 
 @dataclass
 class AgentResponse:
@@ -471,7 +478,7 @@ class Agent:
         system_prompt = SYSTEM_PROMPT.format(
             memory_context=memory_context or "No stored memories yet.",
             current_date=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        )
+        ) + "\n" + VOICE_SYSTEM_PROMPT_ADDENDUM
         conversation_messages = await self.memory.get_conversation_messages()
         ai_messages = [
             AIMessage(role=msg["role"], content=msg["content"])
@@ -483,6 +490,7 @@ class Agent:
         async for delta in self.executor.generate_response_stream(
             messages=ai_messages,
             system_prompt=system_prompt,
+            max_tokens=90,
         ):
             yield delta
 

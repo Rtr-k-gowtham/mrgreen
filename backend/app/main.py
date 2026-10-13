@@ -82,6 +82,15 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    @app.middleware("http")
+    async def add_streaming_headers(request, call_next):
+        response = await call_next(request)
+        # Prevent Nginx and reverse proxy buffering for streaming endpoints
+        if request.url.path.startswith(("/api/chat", "/api/voice", "/api/agent")):
+            response.headers["X-Accel-Buffering"] = "no"
+            response.headers["Cache-Control"] = "no-cache, no-transform"
+        return response
+
     # Register routes
     from app.api.routes.health import router as health_router
     from app.api.routes.chat import router as chat_router
