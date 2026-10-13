@@ -1,5 +1,5 @@
 // MR.GREEN Service Worker - Static Asset Cache Only
-const CACHE_NAME = 'mrgreen-static-v1';
+const CACHE_NAME = 'mrgreen-jarvis-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
