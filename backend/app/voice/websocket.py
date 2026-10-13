@@ -34,6 +34,7 @@ async def voice_websocket(
     WebSocket endpoint for MR.GREEN real-time voice sessions.
     """
     await websocket.accept()
+    logger.info("[VOICE_WS_CONNECTED] New voice WebSocket connection accepted")
 
     session: VoiceSession = voice_session_manager.create_session(
         websocket=websocket,
@@ -55,6 +56,7 @@ async def voice_websocket(
                 continue
 
             event_type = data.get("type")
+            logger.debug("[VOICE_WS_EVENT] session=%s event=%s", session.session_id, event_type)
             payload = data.get("payload") or {}
             # Flatten if fields sent at top level
             if not payload:

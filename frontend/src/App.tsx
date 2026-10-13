@@ -5,6 +5,7 @@ import { HistoryDrawer } from './components/layout/HistoryDrawer';
 import { ChatList } from './components/chat/ChatList';
 import { ChatInput } from './components/chat/ChatInput';
 import { VoiceSettingsModal } from './components/voice/VoiceSettingsModal';
+import { VoiceDiagnosticPanel } from './components/voice/VoiceDiagnosticPanel';
 
 export const App: React.FC = () => {
   const {
@@ -24,6 +25,7 @@ export const App: React.FC = () => {
     sendMessage,
     startNewChat,
     loadConversation,
+    diagnosticEvents,
   } = useChat();
 
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
@@ -128,6 +130,17 @@ export const App: React.FC = () => {
         voices={tts.voices}
         selectedVoice={tts.selectedVoice}
         onSelectVoice={tts.setSelectedVoice}
+      />
+
+      {/* Development-only Voice Diagnostic Panel */}
+      <VoiceDiagnosticPanel
+        voiceState={voiceState}
+        isListening={stt.isListening}
+        isSpeaking={tts.isSpeaking}
+        isProcessing={isProcessing}
+        isOnline={isOnline}
+        sttError={stt.error}
+        diagnosticEvents={diagnosticEvents}
       />
     </div>
   );

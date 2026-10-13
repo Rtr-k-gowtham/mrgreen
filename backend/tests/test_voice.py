@@ -106,3 +106,39 @@ async def test_cosyvoice_tamil_synthesis() -> None:
     assert total_bytes > 44
     full_audio = b"".join(chunks)
     assert full_audio.startswith(b"RIFF")
+
+
+@pytest.mark.asyncio
+async def test_voice_session_initialize() -> None:
+    """Verify VoiceSession initialization sends session.ready event with tts_available flag."""
+    from unittest.mock import AsyncMock, MagicMock
+    from app.voice.session import VoiceSession
+
+    mock_ws = AsyncMock()
+    mock_ai = MagicMock()
+    mock_tools = MagicMock()
+    mock_mem = MagicMock()
+    mock_engine = MagicMock()
+    mock_engine.active_provider.is_available.return_value = True
+    mock_engine.active_provider.get_status.return_value = {
+        "available_profiles": ["GREEN_DEFAULT", "GREEN_TAMIL"],
+    }
+
+    session = VoiceSession(
+        session_id="test_sess_01",
+        websocket=mock_ws,
+        ai_provider=mock_ai,
+        tool_registry=mock_tools,
+        memory_manager=mock_mem,
+        voice_engine=mock_engine,
+        conversation_id="conv_123",
+    )
+
+    await session.initialize()
+    assert session.state == VoiceState.LISTENING
+    assert mock_ws.send_json.called
+    calls = [c[0][0] for c in mock_ws.send_json.call_args_list]
+    ready_event = next(c for c in calls if c["type"] == "session.ready")
+    assert ready_event["conversation_id"] == "conv_123"
+    assert ready_event["tts_available"] is True
+

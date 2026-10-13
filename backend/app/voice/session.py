@@ -7,6 +7,7 @@ and immediate barge-in / interruption handling.
 """
 
 import asyncio
+import time
 import base64
 import logging
 from typing import Any, Callable
@@ -68,10 +69,16 @@ class VoiceSession:
     async def initialize(self) -> None:
         """Mark session connected and ready for speech interaction."""
         self.state = VoiceState.CONNECTED
+        tts_available = self.voice_engine.active_provider.is_available()
+        logger.info(
+            "[SESSION_READY] session=%s conversation=%s tts_available=%s",
+            self.session_id, self.conversation_id, tts_available,
+        )
         await self.send_event(
             ServerEventType.SESSION_READY,
             {
                 "conversation_id": self.conversation_id,
+                "tts_available": tts_available,
                 "supported_profiles": list(
                     self.voice_engine.active_provider.get_status().get("available_profiles", [])
                 ),
@@ -134,9 +141,14 @@ class VoiceSession:
         If interim, stream partial event; if final, trigger agent loop.
         """
         if not text or not text.strip():
+            logger.info("[STT_EMPTY_RESULT] session=%s", self.session_id)
             return
 
         clean_text = text.strip()
+        logger.info(
+            "[USER_MESSAGE_RECEIVED] session=%s is_final=%s text_len=%d",
+            self.session_id, is_final, len(clean_text),
+        )
 
         if not is_final:
             await self.transition_state(VoiceState.USER_SPEAKING)
@@ -158,6 +170,11 @@ class VoiceSession:
         Executes the agent reasoning loop and streams CosyVoice TTS audio.
         """
         self._is_interrupted = False
+        turn_start = time.monotonic()
+        logger.info(
+            "[AGENT_STARTED] session=%s message='%s'",
+            self.session_id, user_message[:80],
+        )
         await self.transition_state(VoiceState.THINKING)
         await self.send_event(ServerEventType.AGENT_THINKING, {"message": user_message})
 
@@ -172,13 +189,20 @@ class VoiceSession:
                 )
 
                 # Process through agent loop
+                logger.info("[LLM_STARTED] session=%s conversation=%s", self.session_id, self.conversation_id)
                 result: AgentResponse = await agent.process_message(
                     user_message=user_message,
                     conversation_id=self.conversation_id,
                 )
 
+                llm_elapsed = time.monotonic() - turn_start
+                logger.info(
+                    "[LLM_COMPLETED] session=%s response_len=%d elapsed=%.2fs iterations=%d",
+                    self.session_id, len(result.content), llm_elapsed, result.iterations,
+                )
+
                 if self._is_interrupted:
-                    logger.info("Agent turn cancelled after processing due to interruption.")
+                    logger.info("[VOICE_INTERRUPTED] Agent turn cancelled after processing.")
                     return
 
                 response_text = result.content
@@ -214,6 +238,7 @@ class VoiceSession:
         if self._is_interrupted or not text.strip():
             return
 
+        tts_start = time.monotonic()
         await self.transition_state(VoiceState.ASSISTANT_SPEAKING)
         sentence_buffer = SentenceBuffer()
         sentences = sentence_buffer.add_delta(text)
@@ -221,6 +246,8 @@ class VoiceSession:
 
         if not sentences:
             sentences = [text]
+
+        logger.info("[TTS_STARTED] session=%s sentences=%d text_len=%d", self.session_id, len(sentences), len(text))
 
         for sentence in sentences:
             if self._is_interrupted:
@@ -249,6 +276,8 @@ class VoiceSession:
             except Exception as e:
                 logger.error("TTS stream error for sentence '%s': %s", sentence[:30], str(e))
                 await self.send_event(ServerEventType.ERROR, {"error": "TTS audio streaming error."})
+
+        logger.info("[TTS_COMPLETED] session=%s elapsed=%.2fs", self.session_id, time.monotonic() - tts_start)
 
     async def close(self) -> None:
         """Gracefully terminate session."""

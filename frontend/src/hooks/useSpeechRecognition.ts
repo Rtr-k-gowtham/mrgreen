@@ -93,7 +93,9 @@ export function useSpeechRecognition({
     // 1. Explicitly prompt / verify microphone permission
     if (navigator?.mediaDevices?.getUserMedia) {
       try {
+        console.log('[MR.GREEN Voice] [MICROPHONE_REQUESTED] Requesting microphone access');
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('[MR.GREEN Voice] [MICROPHONE_GRANTED] Microphone access granted, tracks:', stream.getAudioTracks().length);
         // Immediately release stream so SpeechRecognition can take audio device
         stream.getTracks().forEach((track) => track.stop());
       } catch (permErr: any) {
@@ -146,6 +148,7 @@ export function useSpeechRecognition({
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
+        console.log('[MR.GREEN Voice] [AUDIO_CAPTURE_STARTED] SpeechRecognition active, lang:', recognition.lang);
         setIsListening(true);
         setError(null);
       };
@@ -167,6 +170,7 @@ export function useSpeechRecognition({
 
         if (final) {
           const trimmedFinal = final.trim();
+          console.log('[MR.GREEN Voice] [STT_FINAL] Final transcript:', trimmedFinal.substring(0, 80));
           latestTranscriptRef.current = trimmedFinal;
           setTranscript(trimmedFinal);
           setInterimTranscript('');
@@ -176,6 +180,7 @@ export function useSpeechRecognition({
 
         const currentPhrase = interim.trim();
         if (currentPhrase) {
+          console.log('[MR.GREEN Voice] [STT_PARTIAL] Interim:', currentPhrase.substring(0, 60));
           latestTranscriptRef.current = currentPhrase;
           setInterimTranscript(currentPhrase);
 
@@ -198,6 +203,7 @@ export function useSpeechRecognition({
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.warn('[MR.GREEN Voice] [STT_ERROR] Recognition error:', event.error);
         let errorMessage = 'Voice recognition error occurred.';
         switch (event.error) {
           case 'not-allowed':
