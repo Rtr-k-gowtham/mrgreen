@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://mrgreen:mrgreen_dev_password@localhost:5432/mrgreen_db"
 
+    # AI Provider selection: "gemini" or "ollama"
+    ai_provider: str = "gemini"
+
+    # Gemini
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.8-flash"
+    gemini_embedding_model: str = "gemini-embedding-001"
+    gemini_timeout: int = 60
+
     # Ollama
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen2.5:3b"

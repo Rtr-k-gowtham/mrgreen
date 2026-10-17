@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.gemini import GeminiProvider
 from app.ai.ollama import OllamaProvider
 from app.ai.provider import AIProvider
 from app.config import Settings, get_settings
@@ -19,7 +20,11 @@ from app.tools.registry import ToolRegistry, tool_registry
 
 
 def get_ai_provider() -> AIProvider:
-    """Get the configured AI provider."""
+    """Get the configured AI provider based on application settings."""
+    settings = get_settings()
+    provider_name = (settings.ai_provider or "gemini").lower()
+    if provider_name == "gemini" or settings.gemini_api_key:
+        return GeminiProvider()
     return OllamaProvider()
 
 
