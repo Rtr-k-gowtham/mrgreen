@@ -58,7 +58,7 @@ class VoiceSession:
         self.conversation_id = conversation_id or str(ULID())
 
         self.state: VoiceState = VoiceState.CONNECTING
-        self.active_voice_profile: str = "GREEN_DEFAULT"
+        self.active_voice_profile: str = self.voice_engine.default_profile
         self.active_language: str = "auto"
 
         # Concurrency & interruption controls
@@ -316,7 +316,9 @@ class VoiceSession:
         """Stream audio chunks for a single sentence."""
         if self._is_interrupted or not sentence.strip():
             return
-        await self.send_event(ServerEventType.AUDIO_START, {"text": sentence})
+        audio_fmt = self.voice_engine.audio_format
+        sample_rate = 44100 if audio_fmt == "mp3" else 22050
+        await self.send_event(ServerEventType.AUDIO_START, {"text": sentence, "format": audio_fmt})
         try:
             async for chunk in self.voice_engine.synthesize_stream(
                 text=sentence,
@@ -328,9 +330,9 @@ class VoiceSession:
                 b64_chunk = base64.b64encode(chunk).decode("ascii")
                 await self.send_event(
                     ServerEventType.AUDIO_CHUNK,
-                    {"audio_data": b64_chunk, "format": "wav", "sample_rate": 22050},
+                    {"audio_data": b64_chunk, "format": audio_fmt, "sample_rate": sample_rate},
                 )
-            await self.send_event(ServerEventType.AUDIO_END)
+            await self.send_event(ServerEventType.AUDIO_END, {"format": audio_fmt})
         except Exception as e:
             logger.error("TTS stream error for sentence '%s': %s", sentence[:30], str(e))
             await self.send_event(ServerEventType.ERROR, {"error": "TTS audio streaming error."})

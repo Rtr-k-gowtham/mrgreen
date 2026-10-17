@@ -52,6 +52,7 @@ export class VoiceSocketClient {
   // Audio accumulation — collect chunks between audio.start / audio.end
   private audioChunkBuffer: Uint8Array[] = [];
   private audioPlaybackQueue: Blob[] = [];
+  private currentAudioFormat: string = 'mp3';
   private isPlayingAudio: boolean = false;
   private currentAudioElement: HTMLAudioElement | null = null;
   private currentAudioUrl: string | null = null;
@@ -286,9 +287,10 @@ export class VoiceSocketClient {
 
       case 'audio.start':
         this.audioChunkBuffer = [];
+        this.currentAudioFormat = (data.format || 'mp3').toLowerCase();
         this.emitDiagnostic(
           'TTS_STARTED',
-          `Sentence: "${(data.text || '').substring(0, 60)}"`,
+          `Sentence: "${(data.text || '').substring(0, 60)}" (Format: ${this.currentAudioFormat})`,
         );
         this.callbacks.onAudioStart?.();
         break;
@@ -365,7 +367,8 @@ export class VoiceSocketClient {
     }
     this.audioChunkBuffer = [];
 
-    const blob = new Blob([combined], { type: 'audio/wav' });
+    const mimeType = this.currentAudioFormat === 'mp3' ? 'audio/mpeg' : 'audio/wav';
+    const blob = new Blob([combined], { type: mimeType });
     this.audioPlaybackQueue.push(blob);
 
     if (!this.isPlayingAudio) {

@@ -490,7 +490,7 @@ class Agent:
         async for delta in self.executor.generate_response_stream(
             messages=ai_messages,
             system_prompt=system_prompt,
-            max_tokens=90,
+            max_tokens=500,
         ):
             yield delta
 

@@ -33,11 +33,18 @@ class Settings(BaseSettings):
 
     # Gemini
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3.8-flash"
+    gemini_model: str = "gemini-flash-latest"
     gemini_embedding_model: str = "gemini-embedding-001"
     gemini_timeout: int = 60
 
-    # Ollama
+    # ElevenLabs TTS
+    elevenlabs_api_key: str = ""
+    elevenlabs_voice_id: str = "JBFqnCBsd6RMkjVDRZzb"
+    elevenlabs_tts_model_id: str = "eleven_flash_v2_5"
+    elevenlabs_timeout: int = 30
+    tts_provider: str = "elevenlabs"
+
+    # Ollama (local backup)
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen2.5:3b"
     ollama_embedding_model: str = "qwen2.5:3b"
