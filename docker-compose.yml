@@ -37,6 +37,10 @@ services:
       APP_HOST: 0.0.0.0
       APP_PORT: ${APP_PORT:-8000}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mrgreen}:${POSTGRES_PASSWORD:-mrgreen_dev_password}@127.0.0.1:5432/${POSTGRES_DB:-mrgreen_db}
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://127.0.0.1:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
       OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-qwen2.5:3b}
