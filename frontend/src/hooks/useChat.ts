@@ -9,9 +9,6 @@ import { useSpeechSynthesis } from './useSpeechSynthesis';
 /** Maximum wait (ms) for a WebSocket voice response before timing out. */
 const VOICE_PROCESSING_TIMEOUT_MS = 90_000;
 
-/** Delay (ms) after response.text.done before falling back to browser TTS. */
-const TTS_FALLBACK_DELAY_MS = 1_500;
-
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -38,7 +35,7 @@ export function useChat() {
 
   const tts = useSpeechSynthesis({
     defaultLanguage: activeLanguage === 'auto' ? 'en-IN' : activeLanguage,
-    autoSpeak: true,
+    autoSpeak: false,
   });
   const ttsRef = useRef(tts);
   ttsRef.current = tts;
@@ -143,27 +140,8 @@ export function useChat() {
         setIsProcessing(false);
         wsProcessingRef.current = false;
 
-        // Reset audio tracking for this response
-        receivedCosyAudioRef.current = false;
-
-        // ── TTS Fallback Logic ──
-        // If CosyVoice is not available, use browser TTS as fallback.
-        // Even if CosyVoice is supposedly available, set a timer:
-        // if no audio.start arrives within TTS_FALLBACK_DELAY_MS,
-        // fall back to browser TTS.
-        if (ttsRef.current.voiceEnabled && data.response.trim()) {
-          if (!socketRef.current?.isTtsAvailable()) {
-            // CosyVoice confirmed unavailable — use browser TTS immediately
-            ttsRef.current.speak(data.response);
-          } else {
-            // CosyVoice claims available — wait briefly for audio.start
-            ttsFallbackTimerRef.current = setTimeout(() => {
-              if (!receivedCosyAudioRef.current && ttsRef.current.voiceEnabled) {
-                ttsRef.current.speak(data.response);
-              }
-            }, TTS_FALLBACK_DELAY_MS);
-          }
-        }
+        // Audio is streamed directly via ElevenLabs neural audio chunks on WebSocket
+        // Browser robotic speech synthesis is disabled to ensure only ElevenLabs speaks
       },
 
       onAudioStart: () => {
@@ -359,12 +337,18 @@ export function useChat() {
     async (text: string) => {
       if (!text.trim()) return;
 
-      // Stop any current speech — NOT an interrupt (don't send WS event)
+      // Stop any current audio
       tts.stop();
       if (stt.isListening) {
         stt.stopListening();
       }
       setErrorMessage(null);
+
+      // When WebSocket is connected, route through Voice session so ElevenLabs speaks the response
+      if (socketRef.current?.isConnected()) {
+        handleVoiceFinalResult(text);
+        return;
+      }
 
       const userMsgId = `user-${Date.now()}`;
       const userMessage: ChatMessage = {
@@ -433,10 +417,7 @@ export function useChat() {
         setIsProcessing(false);
         setVoiceState('IDLE');
 
-        // Play assistant speech via browser TTS (HTTP path)
-        if (tts.voiceEnabled) {
-          tts.speak(response.response);
-        }
+        // Browser system voice is disabled; speech is powered exclusively by ElevenLabs
       } catch (err: unknown) {
         setIsProcessing(false);
         setActiveTool(null);
