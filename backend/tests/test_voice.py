@@ -80,13 +80,14 @@ async def test_cosyvoice_english_synthesis() -> None:
     text = "Hello, I am MR.GREEN."
 
     chunks = []
-    async for chunk in engine.synthesize_stream(text, voice_profile_id="GREEN_DEFAULT"):
+    # Test CosyVoice provider directly for WAV format
+    cosy = engine.providers["cosyvoice"]
+    async for chunk in cosy.synthesize(text, voice_profile_id="GREEN_DEFAULT"):
         chunks.append(chunk)
 
     total_bytes = sum(len(c) for c in chunks)
     assert len(chunks) > 0
     assert total_bytes > 44  # Exceeds standard 44-byte WAV header
-    # Check RIFF header magic bytes
     full_audio = b"".join(chunks)
     assert full_audio.startswith(b"RIFF")
 
@@ -98,7 +99,8 @@ async def test_cosyvoice_tamil_synthesis() -> None:
     text = "வணக்கம். நான் MR.GREEN."
 
     chunks = []
-    async for chunk in engine.synthesize_stream(text, voice_profile_id="GREEN_TAMIL"):
+    cosy = engine.providers["cosyvoice"]
+    async for chunk in cosy.synthesize(text, voice_profile_id="GREEN_TAMIL"):
         chunks.append(chunk)
 
     total_bytes = sum(len(c) for c in chunks)

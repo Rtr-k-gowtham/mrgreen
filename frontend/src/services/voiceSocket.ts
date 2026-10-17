@@ -77,9 +77,31 @@ export class VoiceSocketClient {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
-  /** True if the backend reports CosyVoice TTS is genuinely loaded and operational. */
+  /** True if the backend reports TTS is available and operational. */
   public isTtsAvailable(): boolean {
     return this._ttsAvailable;
+  }
+
+  /**
+   * Unlock browser HTML5 Audio playback via user gesture.
+   */
+  public unlockAudio(): void {
+    try {
+      if (typeof window !== 'undefined') {
+        const silentAudio = new Audio(
+          'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA',
+        );
+        silentAudio.volume = 0.01;
+        const p = silentAudio.play();
+        if (p !== undefined) {
+          p.then(() => {
+            silentAudio.pause();
+          }).catch(() => {});
+        }
+      }
+    } catch {
+      // Ignore
+    }
   }
 
   public connect(

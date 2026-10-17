@@ -88,14 +88,14 @@ class VoiceEngine:
         profile_id = voice_profile_id or self.default_profile
         lang = language or detect_language(text)
 
-        # Route CosyVoice-specific profiles to CosyVoice, otherwise use ElevenLabs/active provider
-        if profile_id and (
+        # Primary routing: ElevenLabs is the primary neural TTS provider when available
+        if self.providers["elevenlabs"].is_available():
+            provider = self.providers["elevenlabs"]
+        elif profile_id and (
             profile_id.startswith("GREEN_")
             or profile_id in ("GREEN_DEFAULT", "GREEN_TAMIL", "GREEN_DEEP", "GREEN_CALM")
         ):
             provider = self.providers["cosyvoice"]
-        elif self.active_provider_name == "elevenlabs" and self.providers["elevenlabs"].is_available():
-            provider = self.providers["elevenlabs"]
         else:
             provider = self.active_provider
 

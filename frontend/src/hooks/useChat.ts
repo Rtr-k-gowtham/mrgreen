@@ -224,6 +224,7 @@ export function useChat() {
 
     // Route through WebSocket when connected
     if (socketRef.current?.isConnected()) {
+      socketRef.current.unlockAudio();
       // Add user message to chat immediately
       const userMessage: ChatMessage = {
         id: `user-voice-${Date.now()}`,
@@ -516,5 +517,6 @@ export function useChat() {
     checkConnection,
     diagnosticEvents,
     streamingResponse,
+    unlockVoiceAudio: () => socketRef.current?.unlockAudio(),
   };
 }

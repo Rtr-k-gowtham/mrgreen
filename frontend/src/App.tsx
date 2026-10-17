@@ -24,6 +24,7 @@ export const App: React.FC = () => {
     startNewChat,
     diagnosticEvents,
     streamingResponse,
+    unlockVoiceAudio,
   } = useChat();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -35,6 +36,7 @@ export const App: React.FC = () => {
 
   // Toggle voice input with immediate interruption of assistant speech
   const handleToggleListening = () => {
+    unlockVoiceAudio();
     if (stt.isListening || voiceState === 'LISTENING' || voiceState === 'USER_SPEAKING') {
       stt.stopListening();
     } else {

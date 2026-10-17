@@ -90,10 +90,22 @@ class ElevenLabsProvider(BaseTTSProvider):
 
         client = await self._get_client()
 
-        # Resolve voice id: if voice_profile_id looks like an ElevenLabs ID (>10 chars), use it, else default
-        target_voice = self.voice_id
-        if voice_profile_id and len(voice_profile_id) > 10 and voice_profile_id != "GREEN_DEFAULT":
+        # Map UI voice profiles to proven ElevenLabs voices
+        profile_map = {
+            "GREEN_DEFAULT": self.voice_id,
+            "GREEN_DEEP": "pNInz6obpgDQGcFmaJgB",   # Adam (deep)
+            "GREEN_CALM": "IKne3meq5aSn9XLyUdCD",   # Charlie (calm)
+            "GREEN_TAMIL": self.voice_id,          # Multilingual Flash v2.5 fluent Tamil
+        }
+
+        # Resolve voice id: if voice_profile_id is in profile_map, use it;
+        # if it looks like an explicit ElevenLabs ID (>10 chars), use it; else default.
+        if voice_profile_id in profile_map:
+            target_voice = profile_map[voice_profile_id]
+        elif voice_profile_id and len(voice_profile_id) > 10:
             target_voice = voice_profile_id
+        else:
+            target_voice = self.voice_id
 
         endpoint = f"/text-to-speech/{target_voice}/stream"
 
