@@ -4,7 +4,6 @@ MR.GREEN — API Dependencies
 Shared FastAPI dependencies for route injection.
 """
 
-from collections.abc import AsyncGenerator
 from typing import Any
 
 from fastapi import Depends
@@ -17,6 +16,14 @@ from app.config import Settings, get_settings
 from app.database.session import get_db_session
 from app.memory.memory_manager import MemoryManager
 from app.tools.registry import ToolRegistry, tool_registry
+
+__all__ = [
+    "get_ai_provider",
+    "get_db_session",
+    "get_memory_manager",
+    "get_tool_executor",
+    "get_tool_registry",
+]
 
 
 def get_ai_provider() -> AIProvider:
